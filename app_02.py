@@ -21,8 +21,8 @@ factors = ["Loss of interest", "Feeling down", "Stress", "Worry", "Overthinking"
 # Function: Embed YouTube video 
 def create_iframe(src):
     return html.Iframe(
-        width="560",
-        height="315",
+        width="615",
+        height="346",
         src=src,
         allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture;fullscreen"
     )
@@ -30,7 +30,8 @@ def create_iframe(src):
 # Function: Create dropdown menu 
 def create_dropdown(id, options, placeholder, multi=True):
     return dcc.Dropdown(id=id, options=options, multi=multi, 
-                        value=[], placeholder=placeholder)
+                        value=[], placeholder=placeholder,
+                        style={'width': '81.5%'})
 
 # Layout elements
 nav_col = dbc.Col(
@@ -58,7 +59,10 @@ content_col = dbc.Col(
     md=10,
 )
 
-app.layout = dbc.Container([dbc.Row([nav_col, content_col])])
+app.layout = dbc.Container([
+    dbc.Row([nav_col, content_col]),
+    dcc.Store(id='current-step', data={'step': 0}, storage_type='local')
+])
 
 # Define style to initiate components
 hidden_style = {'display': 'none'}
@@ -71,21 +75,8 @@ home_page = html.Div([
 ])
 
 # Stylesheet for network 
-stylesheet = [
-        {
-            'selector': 'node',
-            'style': {
-                'background-color': 'blue',
-                'label': 'data(label)'
-            }
-        },
-        {
-            'selector': 'edge',
-            'style': {
-                'curve-style': 'bezier',
-                'target-arrow-shape': 'triangle'
-            }
-        }
+stylesheet = [{'selector': 'node','style': {'background-color': 'blue', 'label': 'data(label)'}},
+              {'selector': 'edge','style': {'curve-style': 'bezier', 'target-arrow-shape': 'triangle'}}
     ]
 
 # PsySys step components
@@ -93,13 +84,14 @@ step0_content = html.Div([
     html.Br(), html.Br(), html.Br(),
     create_iframe("https://www.youtube.com/embed/d8ZZyuESXcU?si=CYvKNlf17wnzt4iG"),
     html.Br(), html.Br(),
-    html.P("PsySys instructions")
+    html.P("Please watch this video and begin with the PsySys session.")
 ])
 
 step1_content = html.Div([
     html.Br(), html.Br(), html.Br(),
     create_iframe("https://www.youtube.com/embed/ttLzT4U2F2I?si=xv1ETjdc1uGROZTo"),
     html.Br(), html.Br(),
+    html.P("Please watch the video. Below choose the factors you are currently dealing with."),
     create_dropdown(id="factor-dropdown", 
                     options=[{'label': factor, 'value': factor} for factor in factors],
                     placeholder='Select factors'),
@@ -110,6 +102,8 @@ step2_content = html.Div([
     html.Br(), html.Br(), html.Br(),
     create_iframe("https://www.youtube.com/embed/stqJRtjIPrI?si=1MI5daW_ldY3aQz3"),
     html.Br(), html.Br(),
+    html.P("Please watch the video. Below indicate two causal relations you recognize."),
+    html.P("Example: If you feel that normally worrying causes you to become less concentrated, select these factors below in this order.", style={'width': '70%', 'font-style': 'italic', 'color': 'grey'}),
     create_dropdown(id='step2-dropdown1', options=[], placeholder='Select two factors'),
     html.Br(),
     create_dropdown(id='step2-dropdown2', options=[], placeholder='Select two factors'),
@@ -120,9 +114,10 @@ step3_content = html.Div([
     html.Br(), html.Br(), html.Br(),
     create_iframe('https://www.youtube.com/embed/EdwiSp3BdKk?si=TcqeWxAlGl-_NUfx'),
     html.Br(), html.Br(),
-    create_dropdown(id='step3-dropdown1', options=[], placeholder='Select two factors'),
+    html.P("Please watch the video. Below indicate your vicious cycles. You can choose one containing two factors and another one containing three.", style={'width': '70%'}),
+    create_dropdown(id='step3-dropdown1', options=[], placeholder='Select two factors that reinforce each other'),
     html.Br(),
-    create_dropdown(id='step3-dropdown2', options=[], placeholder='Select three factors'),
+    create_dropdown(id='step3-dropdown2', options=[], placeholder='Select three factors that reinforce each other'),
     html.Br()
 ])
 
@@ -130,6 +125,7 @@ step4_content = html.Div([
     html.Br(), html.Br(), html.Br(),
     create_iframe('https://www.youtube.com/embed/hwisVnJ0y88?si=OpCWAMaDwTThocO6'),
     html.Br(), html.Br(),
+    html.P("Please watch the video. Below indicate the factor you feel is the most influential one in your mental-health map.", style={'width': '70%'}),
     create_dropdown(id='step4-dropdown', options=[], placeholder='Select one factor'),
     html.Br()
 ])
@@ -137,17 +133,9 @@ step4_content = html.Div([
 step5_content = html.Div([
     html.Br(), html.Br(), html.Br(),
     cyto.Cytoscape(
-        id='graph-output',
-        elements=[
-            {'data': {'id': 'one', 'label': 'Node 1'}},
-            {'data': {'id': 'two', 'label': 'Node 2'}},
-            {'data': {'source': 'one', 'target': 'two'}}
-        ],
-        layout={
-        'name': 'cose', 
-        'fit': True,
-        'padding': 10
-        },
+        id='graph-output', 
+        elements=[],
+        layout={'name': 'cose', 'fit': True, 'padding': 10},
         zoom=1,
         pan={'x': 200, 'y': 200},
         stylesheet=stylesheet,
@@ -165,6 +153,7 @@ psysys_session_page = html.Div([
         html.Div(step3_content, id='step3-content', style=hidden_style),
         html.Div(step4_content, id='step4-content', style=hidden_style),
         html.Div(step5_content, id='step5-content', style=hidden_style),
+        dbc.Button("Back", id='back-button', n_clicks=0, style=hidden_style),
         dbc.Button("Next", id='next-button', n_clicks=0)
     ])
 ])
@@ -176,25 +165,49 @@ psysys_session_page = html.Div([
      Output('step2-content', 'style'),
      Output('step3-content', 'style'),
      Output('step4-content', 'style'),
-     Output('step5-content', 'style')],
-    [Input('next-button', 'n_clicks')]
+     Output('step5-content', 'style'),
+     Output('current-step', 'data')],
+    [Input('next-button', 'n_clicks'),
+     Input('back-button', 'n_clicks')],
+    [State('current-step', 'data')]
 )
-def update_step_visibility(n_clicks):
-    if n_clicks == 0:
-        return visible_style, hidden_style, hidden_style, hidden_style, hidden_style, hidden_style
-    elif n_clicks == 1:
-        return hidden_style, visible_style, hidden_style, hidden_style, hidden_style, hidden_style
-    elif n_clicks == 2:
-        return hidden_style, hidden_style, visible_style, hidden_style, hidden_style, hidden_style
-    elif n_clicks == 3: 
-        return hidden_style, hidden_style, hidden_style, visible_style, hidden_style, hidden_style
-    elif n_clicks == 4:
-        return hidden_style, hidden_style, hidden_style, hidden_style, visible_style, hidden_style
-    elif n_clicks == 5:
-        return hidden_style, hidden_style, hidden_style, hidden_style, hidden_style, visible_style
-    else:
-        return hidden_style, hidden_style, hidden_style, hidden_style, hidden_style, hidden_style
+def update_step_visibility(next_clicks, back_clicks, current_step_data):
+    # Ensure clicks are not None
+    next_clicks = next_clicks or 0
+    back_clicks = back_clicks or 0
+
+    # Determine if it's a forward or backward navigation
+    if dash.callback_context.triggered[0]['prop_id'] == 'next-button.n_clicks':
+        current_step_data['step'] += 1
+    elif dash.callback_context.triggered[0]['prop_id'] == 'back-button.n_clicks':
+        current_step_data['step'] -= 1
+        current_step_data['step'] = max(current_step_data['step'], 0)  # Ensure it's not negative
     
+    step = current_step_data['step']
+    
+    styles = [hidden_style] * 6
+    if step < 6:
+        styles[step] = visible_style
+    else:
+        styles[0] = visible_style
+        current_step_data['step'] = 0
+
+    return styles + [current_step_data]
+
+@app.callback(
+    [Output('next-button', 'children'),
+    Output('back-button', 'style')],
+    [Input('current-step', 'data')]
+)
+def update_next_button_label(step_data):
+    current_step = step_data['step']
+    if current_step == 0:
+        return "Start", hidden_style
+    elif current_step == 5:
+        return "Redo", {'margin-right': '495px'}
+    else:
+        return "Next", {'margin-right': '495px'}
+
 # Callback: Update Dropdowns
 @app.callback(
     [Output('step2-dropdown1', 'options'),
@@ -209,12 +222,26 @@ def update_step2_dropdown_options(selected_factors):
     return all_options, all_options, all_options, all_options, all_options
 
 # Callback: Switch between pages
+# @app.callback(
+#     Output('page-content', 'children'),
+#     [Input('url', 'pathname')]
+# )
+# def display_page(pathname):
+#     if pathname == '/psysys-session':
+#         return psysys_session_page
+#     else:
+#         return home_page
+
 @app.callback(
     Output('page-content', 'children'),
-    [Input('url', 'pathname')]
+    [Input('url', 'pathname')],
+    [State('current-step', 'data')]
 )
-def display_page(pathname):
+def display_page(pathname, current_step_data):
     if pathname == '/psysys-session':
+        if current_step_data['step'] == 0:
+            # Here, you might want to update anything else you need to reset
+            pass  # (or remove the if clause if you don't want any reset behavior)
         return psysys_session_page
     else:
         return home_page
