@@ -1,3 +1,4 @@
+# Works - non-responsive design 
 import dash
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
@@ -61,7 +62,8 @@ content_col = dbc.Col(
 
 app.layout = dbc.Container([
     dbc.Row([nav_col, content_col]),
-    dcc.Store(id='current-step', data={'step': 0}, storage_type='local')
+    dcc.Store(id='current-step', data={'step': 0}, storage_type='local'),
+    dcc.Store(id='session-data', storage_type='local')  # New dcc.Store for session data
 ])
 
 # Define style to initiate components
@@ -166,12 +168,14 @@ psysys_session_page = html.Div([
      Output('step3-content', 'style'),
      Output('step4-content', 'style'),
      Output('step5-content', 'style'),
-     Output('current-step', 'data')],
+     Output('current-step', 'data'),
+     Output('session-data', 'data')], ### NEW
     [Input('next-button', 'n_clicks'),
-     Input('back-button', 'n_clicks')],
+     Input('back-button', 'n_clicks'),
+     Input('factor-dropdown', 'value')], ### NEW
     [State('current-step', 'data')]
 )
-def update_step_visibility(next_clicks, back_clicks, current_step_data):
+def update_step_visibility(next_clicks, back_clicks, selected_factors, current_step_data):
     # Ensure clicks are not None
     next_clicks = next_clicks or 0
     back_clicks = back_clicks or 0
@@ -192,15 +196,49 @@ def update_step_visibility(next_clicks, back_clicks, current_step_data):
         styles[0] = visible_style
         current_step_data['step'] = 0
 
-    return styles + [current_step_data]
+    ### NEW
+    if selected_factors is None:
+        session_data = {
+        'current_step': current_step_data['step'],
+        'selected_factors': []
+    }
+    else:
+        session_data = {
+            'current_step': current_step_data['step'],
+            'selected_factors': selected_factors  # Save selected factors
+        }
 
+    return styles + [current_step_data, session_data]
+
+# @app.callback(
+#     [Output('next-button', 'children'),
+#     Output('back-button', 'style')],
+#     [Input('current-step', 'data')]
+# )
+# def update_next_button_label(step_data):
+#     current_step = step_data['step']
+#     if current_step == 0:
+#         return "Start", hidden_style
+#     elif current_step == 5:
+#         return "Redo", {'margin-right': '495px'}
+#     else:
+#         return "Next", {'margin-right': '495px'}
+
+### NEW
 @app.callback(
     [Output('next-button', 'children'),
-    Output('back-button', 'style')],
-    [Input('current-step', 'data')]
+     Output('back-button', 'style')],
+    [Input('current-step', 'data'),
+     Input('session-data', 'data')]  # Include session data as input
 )
-def update_next_button_label(step_data):
-    current_step = step_data['step']
+def update_next_button_label(current_step_data, session_data):
+    # Use session data to determine the current step if available
+    if session_data and 'current_step' in session_data:
+        current_step = session_data['current_step']
+    else:
+        # Fallback to current_step_data if session data is not available
+        current_step = current_step_data['step'] if current_step_data else 0
+
     if current_step == 0:
         return "Start", hidden_style
     elif current_step == 5:
@@ -209,43 +247,68 @@ def update_next_button_label(step_data):
         return "Next", {'margin-right': '495px'}
 
 # Callback: Update Dropdowns
+# @app.callback(
+#     [Output('step2-dropdown1', 'options'),
+#      Output('step2-dropdown2', 'options'),
+#      Output('step3-dropdown1', 'options'),
+#      Output('step3-dropdown2', 'options'),
+#      Output('step4-dropdown', 'options')],
+#     [Input('factor-dropdown', 'value')]
+# )
+# def update_step2_dropdown_options(selected_factors):
+#     all_options = [{'label': factor, 'value': factor} for factor in selected_factors]
+#     return all_options, all_options, all_options, all_options, all_options
+
+### NEW
 @app.callback(
     [Output('step2-dropdown1', 'options'),
      Output('step2-dropdown2', 'options'),
      Output('step3-dropdown1', 'options'),
      Output('step3-dropdown2', 'options'),
      Output('step4-dropdown', 'options')],
-    [Input('factor-dropdown', 'value')]
+    [Input('factor-dropdown', 'value'),
+     Input('session-data', 'data')]  # Include session data as input
 )
-def update_step2_dropdown_options(selected_factors):
-    all_options = [{'label': factor, 'value': factor} for factor in selected_factors]
+def update_step2_dropdown_options(selected_factors, session_data):
+    # Use session data to determine selected factors if available
+    if session_data and 'selected_factors' in session_data:
+        factors = session_data['selected_factors']
+    else:
+        # Fallback to selected_factors input if session data is not available
+        factors = selected_factors
+
+    all_options = [{'label': factor, 'value': factor} for factor in factors]
     return all_options, all_options, all_options, all_options, all_options
 
 # Callback: Switch between pages
-# @app.callback(
-#     Output('page-content', 'children'),
-#     [Input('url', 'pathname')]
-# )
-# def display_page(pathname):
-#     if pathname == '/psysys-session':
-#         return psysys_session_page
-#     else:
-#         return home_page
-
 @app.callback(
     Output('page-content', 'children'),
-    [Input('url', 'pathname')],
-    [State('current-step', 'data')]
+    [Input('url', 'pathname')]
 )
-def display_page(pathname, current_step_data):
+def display_page(pathname):
+    #print(session_data)
     if pathname == '/psysys-session':
-        if current_step_data['step'] == 0:
-            # Here, you might want to update anything else you need to reset
-            pass  # (or remove the if clause if you don't want any reset behavior)
         return psysys_session_page
     else:
         return home_page
 
+# @app.callback(
+#     Output('page-content', 'children'),
+#     [Input('url', 'pathname'),
+#      Input('session-data', 'data')],
+#     [State('current-step', 'data')]
+# )
+# def display_page(pathname, session_data, current_step_data):
+#     if pathname == '/psysys-session':
+#         print(session_data)
+#         if current_step_data['step'] == 0:
+#             # Here, you might want to update anything else you need to reset
+#             pass  # (or remove the if clause if you don't want any reset behavior)
+#         return psysys_session_page
+#     else:
+#         return home_page
+
+# Callback: Generate mental-health map
 @app.callback(
     [Output('graph-output', 'elements'),
      Output('graph-output', 'stylesheet')],
