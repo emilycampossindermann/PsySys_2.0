@@ -1,4 +1,6 @@
-# Works - non-responsive design 
+# Current Version 
+
+# Import libraries
 import dash
 from dash import dcc, html
 from dash.exceptions import PreventUpdate
@@ -17,7 +19,7 @@ import json
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP],suppress_callback_exceptions=True)
 app.title = "PsySys"
 
-# Initialize factors
+# Initialize factor list
 factors = ["Loss of interest", "Feeling down", "Stress", "Worry", "Overthinking", "Sleep problems", 
            "Joint pain", "Changes is appetite", "Self-blame", "Trouble concentrating", "Procrastinating", 
            "Breakup", "Problems at work", "Interpersonal problems"]
@@ -32,11 +34,6 @@ def create_iframe(src):
     )
 
 # Function: Create dropdown menu 
-# def create_dropdown(id, options, value, placeholder, multi=True):
-#     return dcc.Dropdown(id=id, options=options, multi=multi, 
-#                         value=value, placeholder=placeholder,
-#                         style={'width': '81.5%'})
-
 def create_dropdown(id, options, value, placeholder, multi=True):
     return dcc.Dropdown(
         id=id,
@@ -62,7 +59,6 @@ def generate_step_content(step, session_data):
         options = session_data['dropdowns']['initial-selection']['options']
         value = session_data['dropdowns']['initial-selection']['value']
         id = {'type': 'dynamic-dropdown', 'step': 1}
-        # id = 'factor-dropdown'
         text = 'Select factors'
         return html.Div([
             html.Br(), html.Br(), html.Br(),
@@ -79,9 +75,7 @@ def generate_step_content(step, session_data):
         value_chain1 = session_data['dropdowns']['chain1']['value']
         value_chain2 = session_data['dropdowns']['chain2']['value']
         id_chain1 = {'type': 'dynamic-dropdown', 'step': 2}
-        # id_chain1 = 'step2-dropdown1'
         id_chain2 = {'type': 'dynamic-dropdown', 'step': 3}
-        # id_chain2 = 'step2-dropdown2'
         text = 'Select two factors'
         return html.Div([
             html.Br(), html.Br(), html.Br(),
@@ -101,9 +95,7 @@ def generate_step_content(step, session_data):
         value_cycle1 = session_data['dropdowns']['cycle1']['value']
         value_cycle2 = session_data['dropdowns']['cycle2']['value']
         id_cycle1 = {'type': 'dynamic-dropdown', 'step': 4}
-        # id_cycle1 = 'step3-dropdown1'
         id_cycle2 = {'type': 'dynamic-dropdown', 'step': 5}
-        # id_cycle2 = 'step3-dropdown2'
         text1 = 'Select two factors that reinforce each other'
         text2 = 'Select three factors that reiforce each other'
         return html.Div([
@@ -122,7 +114,6 @@ def generate_step_content(step, session_data):
         options = [{'label': factor, 'value': factor} for factor in selected_factors]
         value_target = session_data['dropdowns']['target']['value']
         id = {'type': 'dynamic-dropdown', 'step': 6}
-        # id = 'step4-dropdown'
         text = 'Select one factor'
         return html.Div([
             html.Br(), html.Br(), html.Br(),
@@ -156,7 +147,7 @@ def generate_step_content(step, session_data):
 hidden_style = {'display': 'none'}
 visible_style = {'display': 'block'}
 
-# Layout elements
+# Layout elements: Next & Back button
 button_group = html.Div(
     [
         dbc.Button("Back", id='back-button', n_clicks=0, style=hidden_style),
@@ -169,6 +160,7 @@ button_group = html.Div(
     }
 )
 
+# Layout elements: Navigation sidebar
 nav_col = dbc.Col(
     [
         html.Br(),
@@ -186,6 +178,7 @@ nav_col = dbc.Col(
     md=2,
 )
 
+# Layout elements: Page content
 content_col = dbc.Col(
     [
         dcc.Location(id='url', refresh=False),
@@ -195,6 +188,7 @@ content_col = dbc.Col(
     md=10,
 )
 
+# Define app layout
 app.layout = dbc.Container([
     dbc.Row([nav_col, content_col]),
     dcc.Store(id='current-step', data={'step': 0}, storage_type='local'),
@@ -212,7 +206,7 @@ app.layout = dbc.Container([
     }, storage_type='session')
 ])
 
-# Define content for Home
+# Define content for Home tab
 home_page = html.Div([
     html.H1("Welcome to PsySys App!"),
     html.P("This is the Home tab. More content to come!"),
@@ -298,7 +292,7 @@ def update_hidden_div(values):
     # Convert values to JSON and return
     return json.dumps(values)
 
-# Callback for updating session-data based on the hidden Div
+# Callback for updating session-data (dropdowns) based on hidden Div
 @app.callback(
     Output('session-data', 'data'),
     Input('hidden-div', 'children'),
@@ -326,127 +320,150 @@ def update_session_data(json_values, session_data, current_step_data):
 
     return session_data
 
-# Callback: Update n_clicks & session data based on current step (reset if 0)
+# Callback: Update session data based on current step (reset if 0)
+@app.callback(
+    [Output('session-data', 'data', allow_duplicate=True)],
+    Input('current-step', 'data'),
+    prevent_initial_call=True
+)
+def reset(current_step_data):
+    if current_step_data['step'] == 0:
+        data = {
+            'dropdowns': {
+                'initial-selection': {'options': [{'label': factor, 'value': factor} for factor in factors], 'value': None},
+                'chain1': {'options': [], 'value': None},
+                'chain2': {'options': [], 'value': None},
+                'cycle1': {'options': [], 'value': None},
+                'cycle2': {'options': [], 'value': None},
+                'target': {'options': [], 'value': None},
+            },
+            'elements': []
+        }
+        return (data,) 
 
+    else:
+        return (dash.no_update,)  
 
 # Callback: Generate mental-health map
-# @app.callback(
-#     [Output('graph-output', 'elements'),
-#      Output('graph-output', 'stylesheet')],
-#     [Input('factor-dropdown', 'value'),
-#      Input('step2-dropdown1', 'value'),
-#      Input('step2-dropdown2', 'value'),
-#      Input('step3-dropdown1', 'value'),
-#      Input('step3-dropdown2', 'value'),
-#      Input('step4-dropdown', 'value')]
-# )
-# def generate_graph(selected_factors, s2d1, s2d2, s3d1, s3d2, influential_factor):
-#     # 1. Convert networkx graph into a dash_cytoscape format
-#     elements = []
-#     stylesheet = [
-#         {
-#             'selector': 'node',
-#             'style': {
-#                 'background-color': 'blue',
-#                 'label': 'data(label)'
-#             }
-#         },
-#         {
-#             'selector': 'edge',
-#             'style': {
-#                 'curve-style': 'bezier',
-#                 'target-arrow-shape': 'triangle'
-#             }
-#         }
-#     ]
+@app.callback(
+    [Output('graph-output', 'elements'),
+     Output('graph-output', 'stylesheet')],
+    [Input('session-data', 'data')]
+)
+def generate_graph(session_data):
 
-#     for factor in selected_factors:
-#         elements.append({'data': {'id': factor, 'label': factor}})
+    selected_factors = session_data['dropdowns']['initial-selection']['value'] or []
+    s2d1 = session_data['dropdowns']['chain1']['value']
+    s2d2 = session_data['dropdowns']['chain2']['value']
+    s3d1 = session_data['dropdowns']['cycle1']['value']
+    s3d2 = session_data['dropdowns']['cycle2']['value']
+    influential_factor = session_data['dropdowns']['target']['value']
 
-#     existing_edges = set()
+    elements = []
+    stylesheet = [
+        {
+            'selector': 'node',
+            'style': {
+                'background-color': 'blue',
+                'label': 'data(label)'
+            }
+        },
+        {
+            'selector': 'edge',
+            'style': {
+                'curve-style': 'bezier',
+                'target-arrow-shape': 'triangle'
+            }
+        }
+    ]
 
-#     def add_edge(source, target):
-#         edge_key = f"{source}->{target}"  # Create a unique key for the edge
-#         if edge_key not in existing_edges:
-#             elements.append({'data': {'source': source, 'target': target}})
-#             existing_edges.add(edge_key)
+    for factor in selected_factors:
+        elements.append({'data': {'id': factor, 'label': factor}})
+
+    existing_edges = set()
+
+    def add_edge(source, target):
+        edge_key = f"{source}->{target}"  # Create a unique key for the edge
+        if edge_key not in existing_edges:
+            elements.append({'data': {'source': source, 'target': target}})
+            existing_edges.add(edge_key)
     
-#     if s2d1 and len(s2d1) == 2:
-#         add_edge(s2d1[0], s2d1[1])
+    if s2d1 and len(s2d1) == 2:
+        add_edge(s2d1[0], s2d1[1])
 
-#     if s2d2 and len(s2d2) == 2:
-#         add_edge(s2d2[0], s2d2[1])
+    if s2d2 and len(s2d2) == 2:
+        add_edge(s2d2[0], s2d2[1])
 
-#     if s3d1 and len(s3d1) == 2:
-#         add_edge(s3d1[0], s3d1[1])
-#         add_edge(s3d1[1], s3d1[0])
+    if s3d1 and len(s3d1) == 2:
+        add_edge(s3d1[0], s3d1[1])
+        add_edge(s3d1[1], s3d1[0])
 
-#     if s3d2 and len(s3d2) == 3:
-#         add_edge(s3d2[0], s3d2[1])
-#         add_edge(s3d2[1], s3d2[2])
-#         add_edge(s3d2[2], s3d2[0])
+    if s3d2 and len(s3d2) == 3:
+        add_edge(s3d2[0], s3d2[1])
+        add_edge(s3d2[1], s3d2[2])
+        add_edge(s3d2[2], s3d2[0])
 
-#     # Color gradient corresponding to out-degree centrality
-#     # 1. Calculate the out-degree centrality
-#     out_degrees = {element['data']['id']: 0 for element in elements if 'id' in element['data']}
+    # Color gradient corresponding to out-degree centrality
+    # 1. Calculate the out-degree centrality
+    out_degrees = {element['data']['id']: 0 for element in elements if 'id' in element['data']}
 
-#     # Then, compute out-degrees for each node
-#     for element in elements:
-#         if 'source' in element['data']:
-#             source = element['data']['source']
-#             out_degrees[source] = out_degrees.get(source, 0) + 1
+    # Then, compute out-degrees for each node
+    for element in elements:
+        if 'source' in element['data']:
+            source = element['data']['source']
+            out_degrees[source] = out_degrees.get(source, 0) + 1
 
-#     # 2. Normalize the out-degree values
-#     if out_degrees:  # Check if the list is not empty
-#         min_degree = min(out_degrees.values())
-#         max_degree = max(out_degrees.values())
-#     else:
-#         min_degree = 0
-#         max_degree = 1
+    # 2. Normalize the out-degree values
+    if out_degrees:  # Check if the list is not empty
+        min_degree = min(out_degrees.values())
+        max_degree = max(out_degrees.values())
+    else:
+        min_degree = 0
+        max_degree = 1
 
-#     def normalize(value):
-#         value = float(value)
-#         if max_degree - min_degree == 0:
-#             return 0.5  
-#         return (value - min_degree) / (max_degree - min_degree)
+    def normalize(value):
+        value = float(value)
+        if max_degree - min_degree == 0:
+            return 0.5  
+        return (value - min_degree) / (max_degree - min_degree)
 
 
-#     normalized_degrees = {node: normalize(degree) for node, degree in out_degrees.items()}
+    normalized_degrees = {node: normalize(degree) for node, degree in out_degrees.items()}
 
-#     # 3. Generate the color gradient
-#     def get_color(value):
-#         # The blue component remains constant at 255
-#         b = 255
-#         # Linear interpolation for the red and green components
-#         r = int(173 * (1 - value))
-#         g = int(216 * (1 - value))
-#         return r, g, b
+    # 3. Generate the color gradient
+    def get_color(value):
+        # The blue component remains constant at 255
+        b = 255
+        # Linear interpolation for the red and green components
+        r = int(173 * (1 - value))
+        g = int(216 * (1 - value))
+        return r, g, b
     
-#     color_map = {node: get_color(value) for node, value in normalized_degrees.items()}
+    color_map = {node: get_color(value) for node, value in normalized_degrees.items()}
 
-#     # 4. Update the stylesheet
-#     for node, color in color_map.items():
-#         r, g, b = color
-#         stylesheet.append({
-#             'selector': f'node[id="{node}"]',
-#             'style': {
-#                 'background-color': f'rgb({r},{g},{b})'
-#             }
-#         })
+    # 4. Update the stylesheet
+    for node, color in color_map.items():
+        r, g, b = color
+        stylesheet.append({
+            'selector': f'node[id="{node}"]',
+            'style': {
+                'background-color': f'rgb({r},{g},{b})'
+            }
+        })
 
-#     # Add your influential node style
-#     if influential_factor:
-#         stylesheet.append(
-#             {
-#                 'selector': f'node[id = "{influential_factor[0]}"]',
-#                 'style': {
-#                     'border-color': 'red',
-#                     'border-width': '2px' 
-#                 }
-#             }
-#         )
+    # Add influential node style
+    if influential_factor:
+        stylesheet.append(
+            {
+                'selector': f'node[id = "{influential_factor[0]}"]',
+                'style': {
+                    'border-color': 'red',
+                    'border-width': '2px' 
+                }
+            }
+        )
 
-#     return elements, stylesheet
+    return elements, stylesheet
 
 if __name__ == '__main__':
     app.run_server(debug=True, port=8001)
