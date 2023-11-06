@@ -1,7 +1,9 @@
 # Works - non-responsive design 
 import dash
 from dash import dcc, html
-from dash.dependencies import Input, Output, State
+from dash.exceptions import PreventUpdate
+from dash import callback_context
+from dash.dependencies import Input, Output, State, MATCH, ALL
 import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
 import networkx as nx
@@ -10,6 +12,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+import json
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP],suppress_callback_exceptions=True)
 app.title = "PsySys"
@@ -29,10 +32,125 @@ def create_iframe(src):
     )
 
 # Function: Create dropdown menu 
-def create_dropdown(id, options, placeholder, multi=True):
-    return dcc.Dropdown(id=id, options=options, multi=multi, 
-                        value=[], placeholder=placeholder,
-                        style={'width': '81.5%'})
+# def create_dropdown(id, options, value, placeholder, multi=True):
+#     return dcc.Dropdown(id=id, options=options, multi=multi, 
+#                         value=value, placeholder=placeholder,
+#                         style={'width': '81.5%'})
+
+def create_dropdown(id, options, value, placeholder, multi=True):
+    return dcc.Dropdown(
+        id=id,
+        options=options,
+        value=value,
+        placeholder=placeholder,
+        multi=multi,
+        style={'width': '81.5%'}
+    )
+
+# Function: Generate step content based on session data
+def generate_step_content(step, session_data):
+
+    if step == 0:
+        return html.Div([
+            html.Br(), html.Br(), html.Br(),
+            create_iframe("https://www.youtube.com/embed/d8ZZyuESXcU?si=CYvKNlf17wnzt4iG"),
+            html.Br(), html.Br(),
+            html.P("Please watch this video and begin with the PsySys session.")
+        ])
+    
+    if step == 1:
+        options = session_data['dropdowns']['initial-selection']['options']
+        value = session_data['dropdowns']['initial-selection']['value']
+        id = {'type': 'dynamic-dropdown', 'step': 1}
+        # id = 'factor-dropdown'
+        text = 'Select factors'
+        return html.Div([
+            html.Br(), html.Br(), html.Br(),
+            create_iframe("https://www.youtube.com/embed/ttLzT4U2F2I?si=xv1ETjdc1uGROZTo"),
+            html.Br(), html.Br(),
+            html.P("Please watch the video. Below choose the factors you are currently dealing with."),
+            create_dropdown(id=id, options=options, value=value, placeholder=text),
+            html.Br(),
+        ])
+
+    if step == 2:
+        selected_factors = session_data['dropdowns']['initial-selection']['value'] or []
+        options = [{'label': factor, 'value': factor} for factor in selected_factors]
+        value_chain1 = session_data['dropdowns']['chain1']['value']
+        value_chain2 = session_data['dropdowns']['chain2']['value']
+        id_chain1 = {'type': 'dynamic-dropdown', 'step': 2}
+        # id_chain1 = 'step2-dropdown1'
+        id_chain2 = {'type': 'dynamic-dropdown', 'step': 3}
+        # id_chain2 = 'step2-dropdown2'
+        text = 'Select two factors'
+        return html.Div([
+            html.Br(), html.Br(), html.Br(),
+            create_iframe("https://www.youtube.com/embed/stqJRtjIPrI?si=1MI5daW_ldY3aQz3"),
+            html.Br(), html.Br(),
+            html.P("Please watch the video. Below indicate two causal relations you recognize."),
+            html.P("Example: If you feel that normally worrying causes you to become less concentrated, select these factors below in this order.", style={'width': '70%', 'font-style': 'italic', 'color': 'grey'}),
+            create_dropdown(id=id_chain1, options=options, value=value_chain1, placeholder=text),
+            html.Br(),
+            create_dropdown(id=id_chain2, options=options, value=value_chain2, placeholder=text),
+            html.Br()
+        ])
+    
+    if step == 3:
+        selected_factors = session_data['dropdowns']['initial-selection']['value'] or []
+        options = [{'label': factor, 'value': factor} for factor in selected_factors]
+        value_cycle1 = session_data['dropdowns']['cycle1']['value']
+        value_cycle2 = session_data['dropdowns']['cycle2']['value']
+        id_cycle1 = {'type': 'dynamic-dropdown', 'step': 4}
+        # id_cycle1 = 'step3-dropdown1'
+        id_cycle2 = {'type': 'dynamic-dropdown', 'step': 5}
+        # id_cycle2 = 'step3-dropdown2'
+        text1 = 'Select two factors that reinforce each other'
+        text2 = 'Select three factors that reiforce each other'
+        return html.Div([
+            html.Br(), html.Br(), html.Br(),
+            create_iframe('https://www.youtube.com/embed/EdwiSp3BdKk?si=TcqeWxAlGl-_NUfx'),
+            html.Br(), html.Br(),
+            html.P("Please watch the video. Below indicate your vicious cycles. You can choose one containing two factors and another one containing three.", style={'width': '70%'}),
+            create_dropdown(id=id_cycle1, options=options, value=value_cycle1, placeholder=text1),
+            html.Br(),
+            create_dropdown(id=id_cycle2, options=options, value=value_cycle2, placeholder=text2),
+            html.Br()
+        ])
+    
+    if step == 4:
+        selected_factors = session_data['dropdowns']['initial-selection']['value'] or []
+        options = [{'label': factor, 'value': factor} for factor in selected_factors]
+        value_target = session_data['dropdowns']['target']['value']
+        id = {'type': 'dynamic-dropdown', 'step': 6}
+        # id = 'step4-dropdown'
+        text = 'Select one factor'
+        return html.Div([
+            html.Br(), html.Br(), html.Br(),
+            create_iframe('https://www.youtube.com/embed/hwisVnJ0y88?si=OpCWAMaDwTThocO6'),
+            html.Br(), html.Br(),
+            html.P("Please watch the video. Below indicate the factor you feel is the most influential one in your mental-health map.", style={'width': '70%'}),
+            create_dropdown(id=id, options=options, value=value_target, placeholder=text),
+            html.Br()
+        ])
+
+    if step == 5:
+        elements = session_data.get('elements', [])
+        return html.Div([
+            html.Br(), html.Br(), html.Br(),
+            cyto.Cytoscape(
+                id='graph-output', 
+                elements=elements,
+                layout={'name': 'cose', 'fit': True, 'padding': 10},
+                zoom=1,
+                pan={'x': 200, 'y': 200},
+                stylesheet=stylesheet,
+                style={'width': '70%', 'height': '500px'}
+            ),
+            html.Br()
+        ])
+    
+    else:
+        return None
 
 # Define style to initiate components
 hidden_style = {'display': 'none'}
@@ -80,6 +198,7 @@ content_col = dbc.Col(
 app.layout = dbc.Container([
     dbc.Row([nav_col, content_col]),
     dcc.Store(id='current-step', data={'step': 0}, storage_type='local'),
+    html.Div(id='hidden-div', style={'display': 'none'}),
     dcc.Store(id='session-data', data={
         'dropdowns': {
             'initial-selection': {'options':[{'label': factor, 'value': factor} for factor in factors], 'value': None},
@@ -89,7 +208,8 @@ app.layout = dbc.Container([
             'cycle2': {'options':[], 'value': None},
             'target': {'options':[], 'value': None},
             },
-    }, storage_type='local')
+        'elements': []
+    }, storage_type='session')
 ])
 
 # Define content for Home
@@ -103,71 +223,6 @@ stylesheet = [{'selector': 'node','style': {'background-color': 'blue', 'label':
               {'selector': 'edge','style': {'curve-style': 'bezier', 'target-arrow-shape': 'triangle'}}
     ]
 
-# PsySys step components
-step0_content = html.Div([
-    html.Br(), html.Br(), html.Br(),
-    create_iframe("https://www.youtube.com/embed/d8ZZyuESXcU?si=CYvKNlf17wnzt4iG"),
-    html.Br(), html.Br(),
-    html.P("Please watch this video and begin with the PsySys session.")
-])
-
-step1_content = html.Div([
-    html.Br(), html.Br(), html.Br(),
-    create_iframe("https://www.youtube.com/embed/ttLzT4U2F2I?si=xv1ETjdc1uGROZTo"),
-    html.Br(), html.Br(),
-    html.P("Please watch the video. Below choose the factors you are currently dealing with."),
-    create_dropdown(id="factor-dropdown", 
-                    options=[{'label': factor, 'value': factor} for factor in factors],
-                    placeholder='Select factors'),
-    html.Br(),
-])
-
-step2_content = html.Div([
-    html.Br(), html.Br(), html.Br(),
-    create_iframe("https://www.youtube.com/embed/stqJRtjIPrI?si=1MI5daW_ldY3aQz3"),
-    html.Br(), html.Br(),
-    html.P("Please watch the video. Below indicate two causal relations you recognize."),
-    html.P("Example: If you feel that normally worrying causes you to become less concentrated, select these factors below in this order.", style={'width': '70%', 'font-style': 'italic', 'color': 'grey'}),
-    create_dropdown(id='step2-dropdown1', options=[], placeholder='Select two factors'),
-    html.Br(),
-    create_dropdown(id='step2-dropdown2', options=[], placeholder='Select two factors'),
-    html.Br()
-])
-
-step3_content = html.Div([
-    html.Br(), html.Br(), html.Br(),
-    create_iframe('https://www.youtube.com/embed/EdwiSp3BdKk?si=TcqeWxAlGl-_NUfx'),
-    html.Br(), html.Br(),
-    html.P("Please watch the video. Below indicate your vicious cycles. You can choose one containing two factors and another one containing three.", style={'width': '70%'}),
-    create_dropdown(id='step3-dropdown1', options=[], placeholder='Select two factors that reinforce each other'),
-    html.Br(),
-    create_dropdown(id='step3-dropdown2', options=[], placeholder='Select three factors that reinforce each other'),
-    html.Br()
-])
-
-step4_content = html.Div([
-    html.Br(), html.Br(), html.Br(),
-    create_iframe('https://www.youtube.com/embed/hwisVnJ0y88?si=OpCWAMaDwTThocO6'),
-    html.Br(), html.Br(),
-    html.P("Please watch the video. Below indicate the factor you feel is the most influential one in your mental-health map.", style={'width': '70%'}),
-    create_dropdown(id='step4-dropdown', options=[], placeholder='Select one factor'),
-    html.Br()
-])
-
-step5_content = html.Div([
-    html.Br(), html.Br(), html.Br(),
-    cyto.Cytoscape(
-        id='graph-output', 
-        elements=[],
-        layout={'name': 'cose', 'fit': True, 'padding': 10},
-        zoom=1,
-        pan={'x': 200, 'y': 200},
-        stylesheet=stylesheet,
-        style={'width': '70%', 'height': '500px'}
-    ),
-    html.Br()
-])
-
 # Callback: Display the page & next/back button based on current step 
 @app.callback(
     [Output('page-content', 'children'),
@@ -175,9 +230,10 @@ step5_content = html.Div([
      Output('next-button', 'style'),
      Output('next-button', 'children')],
     [Input('url', 'pathname'),
-     Input('current-step', 'data')]
+     Input('current-step', 'data')],
+    [State('session-data', 'data')]
 )
-def update_page_and_buttons(pathname, current_step_data):
+def update_page_and_buttons(pathname, current_step_data, session_data):
     step = current_step_data.get('step', 0)  # Default to step 0 if not found
 
     # Default button states
@@ -192,16 +248,16 @@ def update_page_and_buttons(pathname, current_step_data):
     elif pathname == '/psysys-session':
         # Check the step and update accordingly
         if step == 0:
-            content = step0_content
+            content = generate_step_content(step, session_data)
             next_button_text = "Start"       # Change text to "Start"
         elif step == 1:
-            content = step1_content
+            content = generate_step_content(step, session_data)
         elif 2 <= step <= 4:
-            content = globals().get(f'step{step}_content')
+            content = generate_step_content(step, session_data)
             back_button_style = visible_style            # Show back button
             next_button_style = visible_style            # Show next button
         elif step == 5:
-            content = step5_content
+            content = generate_step_content(step, session_data)
             back_button_style = visible_style           # Show back button
             next_button_text = "Redo"         # Change text to "Redo"
 
@@ -235,139 +291,42 @@ def update_step(back_clicks, next_clicks, current_step_data):
 
 # Callback: Update session data based on user input
 @app.callback(
-    Output('step2-dropdown1', 'options'),
-    [Input('factor-dropdown', 'value')]
+    Output('hidden-div', 'children'),
+    Input({'type': 'dynamic-dropdown', 'step': ALL}, 'value')
 )
-def test_callback(value):
-    print("Callback triggered with value:", value)
-    return [{'label': v, 'value': v} for v in value or []]
+def update_hidden_div(values):
+    # Convert values to JSON and return
+    return json.dumps(values)
 
-# @app.callback(
-#     [
-#         Output('step2-dropdown1', 'options'),
-#         Output('step2-dropdown2', 'options'),
-#         Output('step3-dropdown1', 'options'),
-#         Output('step3-dropdown2', 'options'),
-#         Output('step4-dropdown', 'options')
-#     ],
-#     [Input('factor-dropdown', 'value')]
-# )
-# def populate_followup_dropdowns(selected_factors):
-#     print('drin')
-#     # Check if there's any factor selected
-#     if not selected_factors:
-#         # If nothing is selected, provide empty options
-#         return [], [], [], [], []
+# Callback for updating session-data based on the hidden Div
+@app.callback(
+    Output('session-data', 'data'),
+    Input('hidden-div', 'children'),
+    [State('session-data', 'data'),
+     State('current-step', 'data')]
+)
+def update_session_data(json_values, session_data, current_step_data):
 
-#     # Generate options based on selected factors
-#     options = [{'label': factor, 'value': factor} for factor in selected_factors]
+    step = current_step_data.get('step')
+    values = json.loads(json_values) if json_values else []
 
-#     # Return the same options for all dropdowns in steps 2-4
-#     return options, options, options, options, options
+    if len(values) == 1:
+        if step == 1:
+            session_data['dropdowns']['initial-selection']['value'] = values[0]
+        elif step == 4:
+            session_data['dropdowns']['target']['value'] = values[0]
 
-# @app.callback(
-#     [Output('session-data', 'data'),
-#     Output('step2-dropdown1', 'options')],
-#     [Input('factor-dropdown', 'value')],
-#      State('session-data', 'data')
-# )
+    elif len(values) == 2:
+        if step == 2: 
+            session_data['dropdowns']['chain1']['value'] = values[0]
+            session_data['dropdowns']['chain2']['value'] = values[1]
+        elif step == 3: 
+            session_data['dropdowns']['cycle1']['value'] = values[0]
+            session_data['dropdowns']['cycle2']['value'] = values[1]
 
-# def update_session_data(selected_factors, session_data):
-#     session_data['dropdowns']['initial-selection']['value'] = selected_factors
-#     session_data['dropdowns']['chain1']['options'] = selected_factors
-#     session_data['dropdowns']['chain2']['options'] = selected_factors
-#     session_data['dropdowns']['cycle1']['options'] = selected_factors
-#     session_data['dropdowns']['cycle2']['options'] = selected_factors
-#     session_data['dropdowns']['target']['options'] = selected_factors
-
-#     factors = selected_factors
-
-#     all_options = [{'label': factor, 'value': factor} for factor in factors]
-
-#     print(session_data['dropdowns']['initial-selection']['value'])
-#     print(all_options)
-
-#     return session_data, all_options
-
-# @app.callback(
-#     Output('session-data', 'data'),
-#     [Input('factor-dropdown', 'value'),
-#      Input('step2-dropdown1', 'value'),
-#      Input('step2-dropdown2', 'value'),
-#      Input('step3-dropdown1', 'value'),
-#      Input('step3-dropdown2', 'value'),
-#      Input('step4-dropdown', 'value')],
-#      State('session-data', 'data')
-# )
-
-# def update_session_data(selected_factors, chain1, chain2, cycle1, cycle2, target, session_data):
-#     session_data['dropdowns']['initial-selection']['value'] = selected_factors
-
-#     session_data['dropdowns']['chain1']['options'] = selected_factors
-#     session_data['dropdowns']['chain1']['value'] = chain1
-
-#     session_data['dropdowns']['chain2']['options'] = selected_factors
-#     session_data['dropdowns']['chain2']['value'] = chain2
-
-#     session_data['dropdowns']['cycle1']['options'] = selected_factors
-#     session_data['dropdowns']['cycle1']['value'] = cycle1
-
-#     session_data['dropdowns']['cycle2']['options'] = selected_factors
-#     session_data['dropdowns']['cycle2']['value'] = cycle2
-
-#     session_data['dropdowns']['target']['options'] = selected_factors
-#     session_data['dropdowns']['target']['value'] = target
-
-#     print('first')
-#     print(session_data['dropdown']['initial-selection']['value'])
-
-#     return session_data
-
-# Callback: Update dropdowns & values based on session data (input session data)
-# @app.callback(
-#     [Output('step2-dropdown1', 'options'),
-#      Output('step2-dropdown2', 'options'),
-#      Output('step3-dropdown1', 'options'),
-#      Output('step3-dropdown2', 'options'),
-#      Output('step4-dropdown', 'options')],
-#      Input('factor-dropdown', 'value')
-# )
-
-# def update_dropdowns(factors):
-#     print('hey')
-#     selection = factors
-#     print('second')
-#     print(selection)
-#     all_options = [{'label': factor, 'value': factor} for factor in selection]
-    
-#     return all_options, all_options, all_options, all_options, all_options
-
-# Callback: Populate with value based on session data (not necessary?)
+    return session_data
 
 # Callback: Update n_clicks & session data based on current step (reset if 0)
-
-
-### NEW
-# @app.callback(
-#     [Output('step2-dropdown1', 'options'),
-#      Output('step2-dropdown2', 'options'),
-#      Output('step3-dropdown1', 'options'),
-#      Output('step3-dropdown2', 'options'),
-#      Output('step4-dropdown', 'options')],
-#     [Input('factor-dropdown', 'value'),
-#      Input('session-data', 'data')]  # Include session data as input
-# )
-# def update_step2_dropdown_options(selected_factors, session_data):
-#     # Use session data to determine selected factors if available
-#     if session_data and 'selected_factors' in session_data:
-#         factors = session_data['selected_factors']
-#     else:
-#         # Fallback to selected_factors input if session data is not available
-#         factors = selected_factors
-
-#     all_options = [{'label': factor, 'value': factor} for factor in factors]
-#     return all_options, all_options, all_options, all_options, all_options
-
 
 
 # Callback: Generate mental-health map
