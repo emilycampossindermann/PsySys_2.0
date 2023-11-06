@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import json
 
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP],suppress_callback_exceptions=True)
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP,'https://use.fontawesome.com/releases/v5.8.1/css/all.css'],suppress_callback_exceptions=True)
 app.title = "PsySys"
 
 # Initialize factor list
@@ -126,19 +126,54 @@ def generate_step_content(step, session_data):
 
     if step == 5:
         elements = session_data.get('elements', [])
+
         return html.Div([
-            html.Br(), html.Br(), html.Br(),
-            cyto.Cytoscape(
-                id='graph-output', 
-                elements=elements,
-                layout={'name': 'cose', 'fit': True, 'padding': 10},
-                zoom=1,
-                pan={'x': 200, 'y': 200},
-                stylesheet=stylesheet,
-                style={'width': '70%', 'height': '500px'}
-            ),
-            html.Br()
-        ])
+            html.Div([
+                # Graph Container
+                html.Div([
+                    cyto.Cytoscape(
+                        id='graph-output',
+                        elements=elements,
+                        layout={'name': 'cose', 'fit': True, 'padding': 10},
+                        zoom=1,
+                        pan={'x': 200, 'y': 200},
+                        stylesheet=stylesheet,
+                        style={'width': '90%', 'height': '480px'}
+                    )
+                ], style={'flex': '1'}),
+
+                # Add Node UI Container
+                html.Div([
+                html.Div([
+                    dbc.Input(id='input-node-name', type='text', placeholder='Enter node name', style={'marginRight': '10px', 'borderRadius': '10px'}),
+                    dbc.Button("➕", id='btn-add-node', color="primary"),
+                    ], style={'display': 'flex', 'alignItems': 'center'})
+                    ], style={'width': '300px', 'padding': '10px'})
+                ], style={'display': 'flex', 'height': '470px', 'alignItems': 'flex-start', 'marginTop': '80px'}),
+                html.Br(),
+                ])
+
+    # if step == 5:
+    #     elements = session_data.get('elements', [])
+    #     return html.Div([
+    #         html.Br(), html.Br(), html.Br(),
+    #         cyto.Cytoscape(
+    #             id='graph-output', 
+    #             elements=elements,
+    #             layout={'name': 'cose', 'fit': True, 'padding': 10},
+    #             zoom=1,
+    #             pan={'x': 200, 'y': 200},
+    #             stylesheet=stylesheet,
+    #             style={'width': '70%', 'height': '500px'}
+    #         ),
+    #         html.Br(),
+    #         html.Div([
+    #             html.P("Add Node:"),
+    #             dcc.Input(id='input-node-name', type='text', placeholder='Enter node name'),
+    #             html.Button('Add Node', id='btn-add-node'),
+    #         ], style={'width': '30%', 'padding': '10px'}),
+    #         html.Br()
+    #     ])
     
     else:
         return None
@@ -464,6 +499,67 @@ def generate_graph(session_data):
         )
 
     return elements, stylesheet
+
+@app.callback(
+    Output('graph-output', 'elements', allow_duplicate=True),
+    [Input('btn-add-node', 'n_clicks')],
+    [State('input-node-name', 'value'),
+     State('graph-output', 'elements')],
+     prevent_initial_call=True
+)
+def add_node(n_clicks, node_name, elements):
+    if n_clicks and node_name:
+        # Ensure the node doesn't already exist
+        if not any(node['data']['id'] == node_name for node in elements):
+            new_node = {
+                'data': {'id': node_name, 'label': node_name},
+                'style': {'background-color': 'grey'}
+            }
+            elements.append(new_node)
+    return elements
+
+# @app.callback(
+#     [Output('graph-output', 'elements'),
+#      Output('session-data', 'data')],
+#     [Input('btn-add-node', 'n_clicks')],
+#     [State('input-node-name', 'value'),
+#      State('graph-output', 'elements'),
+#      State('session-data', 'data')],
+#      prevent_initial_call=True
+# )
+# def add_node(n_clicks, node_name, elements, session_data):
+#     if n_clicks and node_name:
+#         # Ensure the node doesn't already exist
+#         if not any(node['data']['id'] == node_name for node in elements):
+#             new_node = {
+#                 'data': {'id': node_name, 'label': node_name},
+#                 'style': {'background-color': '#yourColorHere'}
+#             }
+#             elements.append(new_node)
+#             # Update session data with new elements
+#             session_data['elements'] = elements
+#             return elements, session_data
+#     # No change in elements, just return the existing state
+#     return elements, session_data
+
+# @app.callback(
+#     [Output('graph-output', 'elements'),
+#      Output('graph-output', 'stylesheet'),
+#      Output('session-data', 'data')],  # Add this output
+#     [Input('session-data', 'data')]
+# )
+# def generate_graph(session_data):
+#     # ... (rest of your code remains unchanged)
+
+#     # This is the part where you append new nodes and edges to elements
+
+#     # Add the code to update the session data with the new elements
+#     session_data['elements'] = elements  # Update the session data with the new elements list
+#     session_data['stylesheet'] = stylesheet  # Update the session data with the new stylesheet list
+
+#     return elements, stylesheet, session_data 
+
+
 
 if __name__ == '__main__':
     app.run_server(debug=True, port=8001)
