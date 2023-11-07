@@ -21,7 +21,7 @@ app.title = "PsySys"
 
 # Initialize factor list
 factors = ["Loss of interest", "Feeling down", "Stress", "Worry", "Overthinking", "Sleep problems", 
-           "Joint pain", "Changes is appetite", "Self-blame", "Trouble concentrating", "Procrastinating", 
+           "Joint pain", "Changes in appetite", "Self-blame", "Trouble concentrating", "Procrastinating", 
            "Breakup", "Problems at work", "Interpersonal problems"]
 
 # Function: Embed YouTube video 
@@ -133,50 +133,143 @@ def generate_step_content(step, session_data):
                 html.Div([
                     cyto.Cytoscape(
                         id='graph-output',
-                        elements=elements,
+                        elements=session_data['elements'],
                         layout={'name': 'cose', 'fit': True, 'padding': 10},
                         zoom=1,
                         pan={'x': 200, 'y': 200},
-                        stylesheet=stylesheet,
+                        stylesheet = session_data['stylesheet'],
                         style={'width': '90%', 'height': '480px'}
                     )
                 ], style={'flex': '1'}),
 
                 # Add Node UI Container
                 html.Div([
-                html.Div([
-                    dbc.Input(id='input-node-name', type='text', placeholder='Enter node name', style={'marginRight': '10px', 'borderRadius': '10px'}),
-                    dbc.Button("➕", id='btn-add-node', color="primary"),
-                    ], style={'display': 'flex', 'alignItems': 'center'})
-                    ], style={'width': '300px', 'padding': '10px'})
+                # Div for adding nodes
+                    html.Div([
+                        dbc.Input(id='input-node-name', type='text', placeholder='Enter node name', style={'marginRight': '10px', 'borderRadius': '10px'}),
+                        dbc.Button("➕", id='btn-add-node', color="primary"),
+                    ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'}),  # Spacing between add and delete rows
+
+                    # Div for deleting nodes
+                    html.Div([
+                        dbc.Input(id='input-delete-node', type='text', placeholder='Enter node ID to delete', style={'marginRight': '10px', 'borderRadius': '10px'}),
+                        dbc.Button("➖", id='btn-delete-node', color="danger"),
+                    ], style={'display': 'flex', 'alignItems': 'center'}),
+                    ], style={'width': '300px', 'padding': '10px', 'marginTop': '80px'})
                 ], style={'display': 'flex', 'height': '470px', 'alignItems': 'flex-start', 'marginTop': '80px'}),
                 html.Br(),
                 ])
-
-    # if step == 5:
-    #     elements = session_data.get('elements', [])
-    #     return html.Div([
-    #         html.Br(), html.Br(), html.Br(),
-    #         cyto.Cytoscape(
-    #             id='graph-output', 
-    #             elements=elements,
-    #             layout={'name': 'cose', 'fit': True, 'padding': 10},
-    #             zoom=1,
-    #             pan={'x': 200, 'y': 200},
-    #             stylesheet=stylesheet,
-    #             style={'width': '70%', 'height': '500px'}
-    #         ),
-    #         html.Br(),
-    #         html.Div([
-    #             html.P("Add Node:"),
-    #             dcc.Input(id='input-node-name', type='text', placeholder='Enter node name'),
-    #             html.Button('Add Node', id='btn-add-node'),
-    #         ], style={'width': '30%', 'padding': '10px'}),
-    #         html.Br()
-    #     ])
     
     else:
         return None
+
+# Function: Make initial graph
+def add_edge(source, target, elements, existing_edges):
+        edge_key = f"{source}->{target}"
+        if edge_key not in existing_edges:
+            elements.append({'data': {'source': source, 'target': target}})
+            existing_edges.add(edge_key)
+            
+            return elements, existing_edges
+        
+def normalize(value, max_degree, min_degree):
+        value = float(value)
+        if max_degree - min_degree == 0:
+            return 0.5  
+        return (value - min_degree) / (max_degree - min_degree)
+
+def graph_init(session_data):
+    selected_factors = session_data['dropdowns']['initial-selection']['value'] or []
+    chain1_elements = session_data['dropdowns']['chain1']['value']
+    chain2_elements = session_data['dropdowns']['chain2']['value']
+    cycle1_elements = session_data['dropdowns']['cycle1']['value']
+    cycle2_elements = session_data['dropdowns']['cycle2']['value']
+    additional_nodes = session_data.get('add-nodes', [])
+
+    # Combine selected factors and additional nodes
+    all_nodes = selected_factors + additional_nodes
+
+    elements = []
+    stylesheet = [
+        {'selector': 'node', 'style': {'background-color': 'blue', 'label': 'data(label)'}},
+        {'selector': 'edge', 'style': {'curve-style': 'bezier', 'target-arrow-shape': 'triangle'}}
+    ]
+
+    elements = [{'data': {'id': factor, 'label': factor}} for factor in all_nodes]
+
+    existing_edges = set()
+
+    if chain1_elements and len(chain1_elements) == 2:
+        add_edge(chain1_elements[0], chain1_elements[1], elements, existing_edges)
+    if chain2_elements and len(chain2_elements) == 2:
+        add_edge(chain2_elements[0], chain2_elements[1], elements, existing_edges)
+    if cycle1_elements and len(cycle1_elements) == 2:
+        add_edge(cycle1_elements[0], cycle1_elements[1], elements, existing_edges)
+        add_edge(cycle1_elements[1], cycle1_elements[0], elements, existing_edges)
+    if cycle2_elements and len(cycle2_elements) == 3:
+        add_edge(cycle2_elements[0], cycle2_elements[1], elements, existing_edges)
+        add_edge(cycle2_elements[1], cycle2_elements[2], elements, existing_edges)
+        add_edge(cycle2_elements[2], cycle2_elements[0], elements, existing_edges)
+
+    # Update the session data with the new elements and stylesheet
+    session_data['elements'] = elements
+    session_data['stylesheet'] = stylesheet
+
+    return session_data
+
+# Function: Color graph (out-degree centrality, target node)
+def graph_color(elements, influential_factor, stylesheet):
+    out_degrees = {element['data']['id']: 0 for element in elements if 'id' in element['data']}
+
+    # Then, compute out-degrees for each node
+    for element in elements:
+        if 'source' in element['data']:
+            source = element['data']['source']
+            out_degrees[source] = out_degrees.get(source, 0) + 1
+
+    # 2. Normalize the out-degree values
+    if out_degrees:  # Check if the list is not empty
+        min_degree = min(out_degrees.values())
+        max_degree = max(out_degrees.values())
+    else:
+        min_degree = 0
+        max_degree = 1
+
+    normalized_degrees = {node: normalize(degree, max_degree, min_degree) for node, 
+                          degree in out_degrees.items()}
+
+    # 3. Generate the color gradient
+    def get_color(value):
+        b = 255
+        r = int(173 * (1 - value))
+        g = int(216 * (1 - value))
+        return r, g, b
+    
+    color_map = {node: get_color(value) for node, value in normalized_degrees.items()}
+
+    # 4. Update the stylesheet
+    for node, color in color_map.items():
+        r, g, b = color
+        stylesheet.append({
+            'selector': f'node[id="{node}"]',
+            'style': {
+                'background-color': f'rgb({r},{g},{b})'
+            }
+        })
+
+    # Add influential node style
+    if influential_factor:
+        stylesheet.append(
+            {
+                'selector': f'node[id = "{influential_factor[0]}"]',
+                'style': {
+                    'border-color': 'red',
+                    'border-width': '2px' 
+                }
+            }
+        )
+
+    return stylesheet
 
 # Define style to initiate components
 hidden_style = {'display': 'none'}
@@ -223,6 +316,11 @@ content_col = dbc.Col(
     md=10,
 )
 
+# Stylesheet for network 
+stylesheet = [{'selector': 'node','style': {'background-color': 'blue', 'label': 'data(label)'}},
+              {'selector': 'edge','style': {'curve-style': 'bezier', 'target-arrow-shape': 'triangle'}}
+    ]
+
 # Define app layout
 app.layout = dbc.Container([
     dbc.Row([nav_col, content_col]),
@@ -237,7 +335,9 @@ app.layout = dbc.Container([
             'cycle2': {'options':[], 'value': None},
             'target': {'options':[], 'value': None},
             },
-        'elements': []
+        'elements': [], 
+        'stylesheet': [],
+        'add-nodes': []
     }, storage_type='session')
 ])
 
@@ -246,11 +346,6 @@ home_page = html.Div([
     html.H1("Welcome to PsySys App!"),
     html.P("This is the Home tab. More content to come!"),
 ])
-
-# Stylesheet for network 
-stylesheet = [{'selector': 'node','style': {'background-color': 'blue', 'label': 'data(label)'}},
-              {'selector': 'edge','style': {'curve-style': 'bezier', 'target-arrow-shape': 'triangle'}}
-    ]
 
 # Callback: Display the page & next/back button based on current step 
 @app.callback(
@@ -372,7 +467,9 @@ def reset(current_step_data):
                 'cycle2': {'options': [], 'value': None},
                 'target': {'options': [], 'value': None},
             },
-            'elements': []
+            'elements': [],
+            'stylesheet': stylesheet,
+            'add-nodes': []
         }
         return (data,) 
 
@@ -381,133 +478,38 @@ def reset(current_step_data):
 
 # Callback: Generate mental-health map
 @app.callback(
-    [Output('graph-output', 'elements'),
-     Output('graph-output', 'stylesheet')],
-    [Input('session-data', 'data')]
+    Output('session-data', 'data', allow_duplicate=True),
+    Input('session-data', 'data'),
+    prevent_initial_call=True
 )
 def generate_graph(session_data):
 
-    selected_factors = session_data['dropdowns']['initial-selection']['value'] or []
-    s2d1 = session_data['dropdowns']['chain1']['value']
-    s2d2 = session_data['dropdowns']['chain2']['value']
-    s3d1 = session_data['dropdowns']['cycle1']['value']
-    s3d2 = session_data['dropdowns']['cycle2']['value']
+    # Generate graph with all elements so far
+    session_data = graph_init(session_data)
+
+    elements = session_data['elements']
+    stylesheet = session_data['stylesheet']
     influential_factor = session_data['dropdowns']['target']['value']
 
-    elements = []
-    stylesheet = [
-        {
-            'selector': 'node',
-            'style': {
-                'background-color': 'blue',
-                'label': 'data(label)'
-            }
-        },
-        {
-            'selector': 'edge',
-            'style': {
-                'curve-style': 'bezier',
-                'target-arrow-shape': 'triangle'
-            }
-        }
-    ]
+    # Color the graph
+    stylesheet = graph_color(elements, influential_factor, stylesheet)
 
-    for factor in selected_factors:
-        elements.append({'data': {'id': factor, 'label': factor}})
+    session_data['elements'] = elements
+    session_data['stylesheet'] = stylesheet
 
-    existing_edges = set()
+    return session_data
 
-    def add_edge(source, target):
-        edge_key = f"{source}->{target}"  # Create a unique key for the edge
-        if edge_key not in existing_edges:
-            elements.append({'data': {'source': source, 'target': target}})
-            existing_edges.add(edge_key)
-    
-    if s2d1 and len(s2d1) == 2:
-        add_edge(s2d1[0], s2d1[1])
-
-    if s2d2 and len(s2d2) == 2:
-        add_edge(s2d2[0], s2d2[1])
-
-    if s3d1 and len(s3d1) == 2:
-        add_edge(s3d1[0], s3d1[1])
-        add_edge(s3d1[1], s3d1[0])
-
-    if s3d2 and len(s3d2) == 3:
-        add_edge(s3d2[0], s3d2[1])
-        add_edge(s3d2[1], s3d2[2])
-        add_edge(s3d2[2], s3d2[0])
-
-    # Color gradient corresponding to out-degree centrality
-    # 1. Calculate the out-degree centrality
-    out_degrees = {element['data']['id']: 0 for element in elements if 'id' in element['data']}
-
-    # Then, compute out-degrees for each node
-    for element in elements:
-        if 'source' in element['data']:
-            source = element['data']['source']
-            out_degrees[source] = out_degrees.get(source, 0) + 1
-
-    # 2. Normalize the out-degree values
-    if out_degrees:  # Check if the list is not empty
-        min_degree = min(out_degrees.values())
-        max_degree = max(out_degrees.values())
-    else:
-        min_degree = 0
-        max_degree = 1
-
-    def normalize(value):
-        value = float(value)
-        if max_degree - min_degree == 0:
-            return 0.5  
-        return (value - min_degree) / (max_degree - min_degree)
-
-
-    normalized_degrees = {node: normalize(degree) for node, degree in out_degrees.items()}
-
-    # 3. Generate the color gradient
-    def get_color(value):
-        # The blue component remains constant at 255
-        b = 255
-        # Linear interpolation for the red and green components
-        r = int(173 * (1 - value))
-        g = int(216 * (1 - value))
-        return r, g, b
-    
-    color_map = {node: get_color(value) for node, value in normalized_degrees.items()}
-
-    # 4. Update the stylesheet
-    for node, color in color_map.items():
-        r, g, b = color
-        stylesheet.append({
-            'selector': f'node[id="{node}"]',
-            'style': {
-                'background-color': f'rgb({r},{g},{b})'
-            }
-        })
-
-    # Add influential node style
-    if influential_factor:
-        stylesheet.append(
-            {
-                'selector': f'node[id = "{influential_factor[0]}"]',
-                'style': {
-                    'border-color': 'red',
-                    'border-width': '2px' 
-                }
-            }
-        )
-
-    return elements, stylesheet
-
+# Callback:
 @app.callback(
-    Output('graph-output', 'elements', allow_duplicate=True),
+    [Output('graph-output', 'elements'),
+     Output('session-data', 'data', allow_duplicate=True)],
     [Input('btn-add-node', 'n_clicks')],
     [State('input-node-name', 'value'),
-     State('graph-output', 'elements')],
-     prevent_initial_call=True
+     State('graph-output', 'elements'), 
+     State('session-data', 'data')],
+     prevent_initial_call = True
 )
-def add_node(n_clicks, node_name, elements):
+def add_node(n_clicks, node_name, elements, session_data):
     if n_clicks and node_name:
         # Ensure the node doesn't already exist
         if not any(node['data']['id'] == node_name for node in elements):
@@ -516,50 +518,45 @@ def add_node(n_clicks, node_name, elements):
                 'style': {'background-color': 'grey'}
             }
             elements.append(new_node)
-    return elements
+        
+        additional_nodes = session_data.get('add-nodes', [])
+        additional_nodes.append(node_name)
+        session_data['add-nodes'] = additional_nodes
 
-# @app.callback(
-#     [Output('graph-output', 'elements'),
-#      Output('session-data', 'data')],
-#     [Input('btn-add-node', 'n_clicks')],
-#     [State('input-node-name', 'value'),
-#      State('graph-output', 'elements'),
-#      State('session-data', 'data')],
-#      prevent_initial_call=True
-# )
-# def add_node(n_clicks, node_name, elements, session_data):
-#     if n_clicks and node_name:
-#         # Ensure the node doesn't already exist
-#         if not any(node['data']['id'] == node_name for node in elements):
-#             new_node = {
-#                 'data': {'id': node_name, 'label': node_name},
-#                 'style': {'background-color': '#yourColorHere'}
-#             }
-#             elements.append(new_node)
-#             # Update session data with new elements
-#             session_data['elements'] = elements
-#             return elements, session_data
-#     # No change in elements, just return the existing state
-#     return elements, session_data
+    return elements, session_data
 
-# @app.callback(
-#     [Output('graph-output', 'elements'),
-#      Output('graph-output', 'stylesheet'),
-#      Output('session-data', 'data')],  # Add this output
-#     [Input('session-data', 'data')]
-# )
-# def generate_graph(session_data):
-#     # ... (rest of your code remains unchanged)
+# Callback: Delete nodes
+@app.callback(
+    [Output('graph-output', 'elements', allow_duplicate=True),
+     Output('session-data', 'data', allow_duplicate=True)],
+    [Input('btn-delete-node', 'n_clicks')],
+    [State('input-delete-node', 'value'),
+     State('graph-output', 'elements'), 
+     State('session-data', 'data')],
+     prevent_initial_call=True
+)
+def delete_node(n_clicks, node_id, elements, session_data):
+    if n_clicks and node_id:
+        # Remove the node from elements
+        elements = [node for node in elements if node['data'].get('id') != node_id]
 
-#     # This is the part where you append new nodes and edges to elements
+        # Update 'add-nodes' in session_data if needed
+        additional_nodes = session_data.get('add-nodes', [])
+        if node_id in additional_nodes:
+            additional_nodes.remove(node_id)
+            session_data['add-nodes'] = additional_nodes
 
-#     # Add the code to update the session data with the new elements
-#     session_data['elements'] = elements  # Update the session data with the new elements list
-#     session_data['stylesheet'] = stylesheet  # Update the session data with the new stylesheet list
-
-#     return elements, stylesheet, session_data 
+    return elements, session_data
 
 
+# INCLUDE GRAPH INFORMATION IN SESSION-DATA ()
+# Button - re-calculate centrality triggering session-data
+
+# DELETE NODE 
+# ADD & DELETE EDGES 
+# 'DOWNLOAD' OPTION
+# INLCUDE MAP IN HOME TAB
+# PROGRESS BAR
 
 if __name__ == '__main__':
     app.run_server(debug=True, port=8001)
