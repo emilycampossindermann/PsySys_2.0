@@ -145,18 +145,31 @@ def generate_step_content(step, session_data):
 
                 # Add Node UI Container
                 html.Div([
-                # Div for adding nodes
+                    # Div for adding nodes
                     html.Div([
-                        dbc.Input(id='input-node-name', type='text', placeholder='Enter node name', style={'marginRight': '10px', 'borderRadius': '10px'}),
+                        dbc.Input(id='input-node-name', type='text', placeholder='Enter new factor', style={'marginRight': '10px', 'borderRadius': '10px'}),
                         dbc.Button("➕", id='btn-add-node', color="primary"),
                     ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'}),  # Spacing between add and delete rows
 
                     # Div for deleting nodes
                     html.Div([
-                        dbc.Input(id='input-delete-node', type='text', placeholder='Enter node ID to delete', style={'marginRight': '10px', 'borderRadius': '10px'}),
+                        dbc.Input(id='input-delete-node', type='text', placeholder='Enter factor to delete', style={'marginRight': '10px', 'borderRadius': '10px'}),
                         dbc.Button("➖", id='btn-delete-node', color="danger"),
+                    ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '25px'}),
+
+                    # Div for adding edges
+                    html.Div([
+                        dcc.Dropdown(id='input-add-edge', options=options, placeholder='Enter new connection', multi=True, style={'width': '96%', 'borderRadius': '10px'}),
+                        dbc.Button("➕", id='btn-add-edge', color="primary"),
+                    ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'}),
+
+                    # Div for deleting edges
+                    html.Div([
+                        dcc.Dropdown(id='input-delete-edge', options=options, placeholder='Enter connection to delete', multi=True, style={'width': '96%', 'borderRadius': '10px'}),
+                        dbc.Button("➖", id='btn-delete-edge', color="danger"),
                     ], style={'display': 'flex', 'alignItems': 'center'}),
-                    ], style={'width': '300px', 'padding': '10px', 'marginTop': '80px'})
+
+                    ], style={'width': '300px', 'padding': '10px', 'marginTop': '80px'}),
                 ], style={'display': 'flex', 'height': '470px', 'alignItems': 'flex-start', 'marginTop': '80px'}),
                 html.Br(),
                 ])
@@ -171,7 +184,7 @@ def map_add_factors(session_data):
     session_data['elements'] = map_elements
     return session_data
 
-# Function: Include causal chains into the map 
+# Function: Add an edge 
 def add_edge(source, target, elements, existing_edges):
         edge_key = f"{source}->{target}"
         if edge_key not in existing_edges:
@@ -179,6 +192,18 @@ def add_edge(source, target, elements, existing_edges):
             existing_edges.add(edge_key)
             return elements, existing_edges
         
+# Function: Delete an edge
+def delete_edge(source, target, elements, existing_edges):
+    edge_key = f"{source}->{target}"
+    if edge_key in existing_edges:
+        for i in range(len(elements) - 1, -1, -1):
+            if elements[i].get('data', {}).get('source') == source and elements[i].get('data', {}).get('target') == target:
+                del elements[i]
+                break
+        existing_edges.remove(edge_key)
+    return elements, existing_edges
+
+# Function: Include causal chains into the map  
 def map_add_chains(session_data):
     map_elements = session_data['elements']
     chain1_elements = session_data['dropdowns']['chain1']['value']
@@ -523,63 +548,73 @@ def delete_node(n_clicks, node_id, elements):
 
     return elements
 
+# Callback: Restrict add and delete edge dropdowns to max 2 values
+@app.callback(
+    Output('input-add-edge', 'value'),
+    Input('input-add-edge', 'value')
+)
+def limit_dropdown_add_edge(add_edge):
+    if add_edge and len(add_edge) > 2:
+        return add_edge[:2]
+    return add_edge
+
+@app.callback(
+    Output('input-delete-edge', 'value'),
+    Input('input-delete-edge', 'value')
+)
+def limit_dropdown_delete_edge(delete_edge):
+    if delete_edge and len(delete_edge) > 2:
+        return delete_edge[:2]
+    return delete_edge
+
+# Callback: Add additional edge to graph
+@app.callback(
+    [Output('graph-output', 'elements', allow_duplicate=True),
+     Output('session-data', 'data', allow_duplicate=True)],
+    [Input('btn-add-edge', 'n_clicks')],
+    [State('input-add-edge', 'value'),
+     State('graph-output', 'elements'),
+     State('session-data', 'data')],
+     prevent_initial_call=True
+)
+
+def add_edge_output(n_clicks, new_edge, elements, session_data):
+    if n_clicks and new_edge:
+        source = new_edge[0]
+        target = new_edge[1]
+        existing_edges = set(session_data['edges'])
+        add_edge(source, target, elements, existing_edges)
+        session_data['edges'] = list(existing_edges)
+    return elements, session_data
+
+# Callback: Delete existing edge from graph
+@app.callback(
+    Output('graph-output', 'elements', allow_duplicate=True),
+    [Input('btn-delete-edge', 'n_clicks')],
+    [State('input-delete-edge', 'value'),
+     State('graph-output', 'elements'),
+     State('session-data', 'data')],
+     prevent_initial_call=True
+)
+
+def delete_edge_output(n_clicks, edge, elements, session_data):
+    if n_clicks and edge:
+        source = edge[0]
+        target = edge[1]
+        existing_edges = set(session_data['edges'])
+        print(existing_edges)
+        print(elements)
+        delete_edge(source, target, elements, existing_edges)
+        print(existing_edges)
+        print(elements)
+    return elements
+
 # Callback: Update session data based on graph output when clicking 'Save' button
 
-# Callback:
-# @app.callback(
-#     [Output('graph-output', 'elements'),
-#      Output('session-data', 'data', allow_duplicate=True)],
-#     [Input('btn-add-node', 'n_clicks')],
-#     [State('input-node-name', 'value'),
-#      State('graph-output', 'elements'), 
-#      State('session-data', 'data')],
-#      prevent_initial_call = True
-# )
-# def add_node(n_clicks, node_name, elements, session_data):
-#     if n_clicks and node_name:
-#         # Ensure the node doesn't already exist
-#         if not any(node['data']['id'] == node_name for node in elements):
-#             new_node = {
-#                 'data': {'id': node_name, 'label': node_name},
-#                 'style': {'background-color': 'grey'}
-#             }
-#             elements.append(new_node)
-        
-#         additional_nodes = session_data.get('add-nodes', [])
-#         additional_nodes.append(node_name)
-#         session_data['add-nodes'] = additional_nodes
+# INCLUDE GRAPH INFORMATION IN SESSION-DATA (**)
+# Button - re-calculate centrality triggering session-data (**)
 
-#     return elements, session_data
-
-# # Callback: Delete nodes
-# @app.callback(
-#     [Output('graph-output', 'elements', allow_duplicate=True),
-#      Output('session-data', 'data', allow_duplicate=True)],
-#     [Input('btn-delete-node', 'n_clicks')],
-#     [State('input-delete-node', 'value'),
-#      State('graph-output', 'elements'), 
-#      State('session-data', 'data')],
-#      prevent_initial_call=True
-# )
-# def delete_node(n_clicks, node_id, elements, session_data):
-#     if n_clicks and node_id:
-#         # Remove the node from elements
-#         elements = [node for node in elements if node['data'].get('id') != node_id]
-
-#         # Update 'add-nodes' in session_data if needed
-#         additional_nodes = session_data.get('add-nodes', [])
-#         if node_id in additional_nodes:
-#             additional_nodes.remove(node_id)
-#             session_data['add-nodes'] = additional_nodes
-
-#     return elements, session_data
-
-
-# INCLUDE GRAPH INFORMATION IN SESSION-DATA ()
-# Button - re-calculate centrality triggering session-data
-
-# DELETE NODE 
-# ADD & DELETE EDGES 
+# ADD & DELETE EDGES (**)
 # 'DOWNLOAD' OPTION
 # INLCUDE MAP IN HOME TAB
 # PROGRESS BAR
