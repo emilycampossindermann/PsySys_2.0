@@ -26,10 +26,10 @@ factors = ["Loss of interest", "Feeling down", "Stress", "Worry", "Overthinking"
            "Breakup", "Problems at work", "Interpersonal problems"]
 
 # Initialize node color schemes
-node_color = ["Out-degree", "Out-/In-degree", "Severity"]
+node_color = ["Out-degree centrality", "In-degree centrality", "Out-/In-degree centrality"]
 
 # Initialize node sizing schemes
-node_size = ["Out-degree", "Out-/In-degree", "Severity"]  
+node_size = ["Out-degree centrality", "In-degree centrality", "Out-/In-degree centrality"] 
 
 # Function: Embed YouTube video 
 def create_iframe(src):
@@ -149,34 +149,6 @@ def generate_step_content(step, session_data):
                         style={'width': '90%', 'height': '480px'}
                     )
                 ], style={'flex': '1'}),
-
-                # Add Node UI Container
-                html.Div([
-                    # Div for adding nodes
-                    html.Div([
-                        dbc.Input(id='input-node-name', type='text', placeholder='Enter new factor', style={'marginRight': '10px', 'borderRadius': '10px'}),
-                        dbc.Button("➕", id='btn-add-node', color="primary"),
-                    ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'}),  # Spacing between add and delete rows
-
-                    # Div for deleting nodes
-                    html.Div([
-                        dbc.Input(id='input-delete-node', type='text', placeholder='Enter factor to delete', style={'marginRight': '10px', 'borderRadius': '10px'}),
-                        dbc.Button("➖", id='btn-delete-node', color="danger"),
-                    ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '25px'}),
-
-                    # Div for adding edges
-                    html.Div([
-                        dcc.Dropdown(id='input-add-edge', options=options, placeholder='Enter new connection', multi=True, style={'width': '96%', 'borderRadius': '10px'}),
-                        dbc.Button("➕", id='btn-add-edge', color="primary"),
-                    ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'}),
-
-                    # Div for deleting edges
-                    html.Div([
-                        dcc.Dropdown(id='input-delete-edge', options=options, placeholder='Enter connection to delete', multi=True, style={'width': '96%', 'borderRadius': '10px'}),
-                        dbc.Button("➖", id='btn-delete-edge', color="danger"),
-                    ], style={'display': 'flex', 'alignItems': 'center'}),
-
-                    ], style={'width': '300px', 'padding': '10px', 'marginTop': '80px'}),
                 ], style={'display': 'flex', 'height': '470px', 'alignItems': 'flex-start', 'marginTop': '80px'}),
                 html.Br(),
                 ])
@@ -234,7 +206,7 @@ def create_mental_health_map_tab(edit_map_data):
                 html.Div([
                     dcc.Dropdown(id='edit-edge', options=options, placeholder='Enter connection', multi=True, style={'width': '96%', 'borderRadius': '10px'}),
                     dbc.Button("➕", id='btn-plus-edge', color="primary", style={'marginRight': '5px'}),
-                    dbc.Button("➖", id='btn-delete-edge', color="danger")
+                    dbc.Button("➖", id='btn-minus-edge', color="danger")
                 ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'}),
             
                 html.Div([
@@ -306,51 +278,73 @@ def map_add_cycles(session_data):
     session_data['elements'] = map_elements
     session_data['edges'] = list(existing_edges)
     return session_data
-        
+
+# Function: Normalize        
 def normalize(value, max_degree, min_degree):
-        value = float(value)
-        if max_degree - min_degree == 0:
-            return 0.5  
-        
-        return (value - min_degree) / (max_degree - min_degree)
+    value = float(value)
+    if max_degree - min_degree == 0:
+        return 0.5  
+    return (value - min_degree) / (max_degree - min_degree)
 
-# Function: Color graph (out-degree centrality, target node)
-def graph_color(session_data):
-    map_elements = session_data['elements']
-    influential_factor = session_data['dropdowns']['target']['value']
-    stylesheet = [{'selector': 'node','style': {'background-color': 'blue', 'label': 'data(label)'}},
-              {'selector': 'edge','style': {'curve-style': 'bezier', 'target-arrow-shape': 'triangle'}}
-    ]
+# Function: Color gradient
+def get_color(value):
+    b = 255
+    r = int(173 * (1 - value))
+    g = int(216 * (1 - value))
+    return r, g, b
 
-    out_degrees = {element['data']['id']: 0 for element in map_elements if 'id' in element['data']}
-
-    # Then, compute out-degrees for each node
-    for element in map_elements:
+# Function: Calculate degree centrality
+def calculate_degree_centrality(elements, degrees):
+    for element in elements:
         if 'source' in element['data']:
             source = element['data']['source']
-            out_degrees[source] = out_degrees.get(source, 0) + 1
+            degrees[source]['out'] = degrees[source].get('out', 0) + 1
+        if 'target' in element['data']:
+            target = element['data']['target']
+            degrees[target]['in'] = degrees[target].get('in', 0) + 1
+    return elements, degrees
 
-    # 2. Normalize the out-degree values
-    if out_degrees:  # Check if the list is not empty
-        min_degree = min(out_degrees.values())
-        max_degree = max(out_degrees.values())
+# Function: Color depending on degree centrality
+## (1) Out-degree centrality (most active), 
+## (2) In-degree centrality (most passive), 
+## (3) Out-/In-degree centrality (most influential - combining Out- and in- info)
+
+def color_scheme(type, graph_data):
+    elements = graph_data['elements']
+    stylesheet = graph_data['stylesheet']
+    degrees = {element['data']['id']: {'out': 0, 'in': 0} for element in 
+               elements if 'id' in element['data']}
+    
+    # Calculate in-degree and out-degree
+    elements, degrees = calculate_degree_centrality(elements, degrees)
+
+    # Compute centrality based on the selected type
+    computed_degrees = {}
+    for id, degree_counts in degrees.items():
+        if type == "Out-degree centrality":
+            computed_degrees[id] = degree_counts['out']
+        elif type == "In-degree centrality":
+            computed_degrees[id] = degree_counts['in']
+        elif type == "Out-/In-degree centrality":
+            if degree_counts['in'] != 0:
+                computed_degrees[id] = degree_counts['out'] / degree_counts['in']
+            else:
+                computed_degrees[id] = 0  # or some other default value you deem appropriate
+
+    if computed_degrees:
+        min_degree = min(computed_degrees.values())
+        max_degree = max(computed_degrees.values())
     else:
         min_degree = 0
         max_degree = 1
 
-    normalized_degrees = {node: normalize(degree, max_degree, min_degree) for node, 
-                          degree in out_degrees.items()}
+    # Normalizing the degrees
+    normalized_degrees = {node: normalize(degree, max_degree, min_degree) for node, degree in computed_degrees.items()}
 
-    # 3. Generate the color gradient
-    def get_color(value):
-        b = 255
-        r = int(173 * (1 - value))
-        g = int(216 * (1 - value))
-        return r, g, b
-    
+    # Create a color map based on normalized degrees
     color_map = {node: get_color(value) for node, value in normalized_degrees.items()}
 
-    # 4. Update the stylesheet
+    # Update the stylesheet
     for node, color in color_map.items():
         r, g, b = color
         stylesheet.append({
@@ -359,20 +353,85 @@ def graph_color(session_data):
                 'background-color': f'rgb({r},{g},{b})'
             }
         })
+    
+    graph_data['stylesheet'] = stylesheet  # Corrected the assignment operator
+    
+    return graph_data
+
+# Function: Adjust node sizes
+def normalize_size(value, max_value, min_value, min_size, max_size):
+    # Normalize the value to a range between min_size and max_size
+    normalized = (value - min_value) / (max_value - min_value)
+    return normalized * (max_size - min_size) + min_size
+
+def node_sizing(type, graph_data, min_size=10, max_size=50):
+    elements = graph_data['elements']
+    stylesheet = graph_data['stylesheet']
+    degrees = {element['data']['id']: {'out': 0, 'in': 0} for element in 
+               elements if 'id' in element['data']}
+
+    # Calculate in-degree and out-degree
+    elements, degrees = calculate_degree_centrality(elements, degrees)
+
+    computed_degrees = {}
+    for node_id, degree_counts in degrees.items():
+        if type == "Out-degree centrality":
+            computed_degrees[node_id] = degree_counts['out']
+        elif type == "In-degree centrality":
+            computed_degrees[node_id] = degree_counts['in']
+        elif type == "Out-/In-degree centrality":
+            computed_degrees[node_id] = degree_counts['out'] / degree_counts['in'] if degree_counts['in'] != 0 else 0
+
+    if computed_degrees:
+        min_degree = min(computed_degrees.values())
+        max_degree = max(computed_degrees.values())
+    else:
+        min_degree = 0
+        max_degree = 1
+
+    # Set node sizes based on normalized degrees
+    for node_id, degree in computed_degrees.items():
+        size = normalize_size(degree, max_degree, min_degree, min_size, max_size)
+        stylesheet.append({
+            'selector': f'node[id="{node_id}"]',
+            'style': {
+                'width': size,
+                'height': size
+            }
+        })
+
+    graph_data['stylesheet'] = stylesheet
+    return graph_data
+
+# Function: Color most influential fator in graph 
+def color_target(graph_data):
+    influential_factor = graph_data['dropdowns']['target']['value']
+    stylesheet = graph_data['stylesheet']
+
+    if influential_factor:
+        stylesheet.append({'selector': f'node[id = "{influential_factor[0]}"]',
+                           'style': {'border-color': 'red','border-width': '2px'}})
+        
+    graph_data['stylesheet'] = stylesheet
+    return graph_data
+
+def reset_target(graph_data):
+    stylesheet = graph_data['stylesheet']
+    new_stylesheet = [style for style in stylesheet 
+                      if not (style.get('style', {}).get('border-color') == 'red')]
+    graph_data['stylesheet'] = new_stylesheet
+    return graph_data
+
+# Function: Color graph (out-degree centrality, target node)
+def graph_color(session_data):
 
     # Add influential node style
-    if influential_factor:
-        stylesheet.append(
-            {
-                'selector': f'node[id = "{influential_factor[0]}"]',
-                'style': {
-                    'border-color': 'red',
-                    'border-width': '2px' 
-                }
-            }
-        )
+    session_data = color_scheme(type="Out-degree centrality", graph_data=session_data)
+    session_data = reset_target(session_data)
+    session_data = color_target(session_data)
 
-    session_data['stylesheet'] = stylesheet
+    #session_data = node_sizing(type="Out-degree centrality", graph_data=session_data)
+
     return session_data
 
 # Define style to initiate components
@@ -684,19 +743,20 @@ def upload_graph(contents, filename):
         return data
     return dash.no_update
 
-# Callback: Add additional node to graph 
+# Callback: Download network as image ***
+
+# Callback: Edit map - add node
 @app.callback(
-    [Output('graph-output', 'elements'),
-     Output('input-add-edge', 'options'),
-     Output('input-delete-edge', 'options'),
-     Output('session-data', 'data', allow_duplicate=True)],
-    [Input('btn-add-node', 'n_clicks')],
-    [State('input-node-name', 'value'),
-     State('graph-output', 'elements'),
-     State('session-data', 'data')],
+    [Output('my-mental-health-map', 'elements'),
+     Output('edit-edge', 'options'),
+     Output('edit-map-data', 'data', allow_duplicate=True)],
+    [Input('btn-plus-node', 'n_clicks')],
+    [State('edit-node', 'value'),
+     State('my-mental-health-map', 'elements'),
+     State('edit-map-data', 'data')],
      prevent_initial_call = True
 )
-def add_node(n_clicks, node_name, elements, session_data): 
+def map_add_node(n_clicks, node_name, elements, edit_map_data): 
     # Else append new node name to add-node list
     if n_clicks and node_name:
         # Ensure the node doesn't already exist
@@ -709,102 +769,113 @@ def add_node(n_clicks, node_name, elements, session_data):
 
     # Extract all node names
     node_names = [node['data']['id'] for node in elements if 'id' in node['data'] and len(node['data']['id']) < 30]
-    session_data['add-nodes'] = node_names
+    edit_map_data['add-nodes'] = node_names
+    edit_map_data['elements'] = elements
 
-    return elements, node_names, node_names, session_data
+    return elements, node_names, edit_map_data
 
 # Callback: Remove existing node from graph
 @app.callback(
-    [Output('graph-output', 'elements', allow_duplicate=True),
-     Output('input-add-edge', 'options', allow_duplicate=True),
-     Output('input-delete-edge', 'options', allow_duplicate=True),
-     Output('session-data', 'data', allow_duplicate=True)],
-    [Input('btn-delete-node', 'n_clicks')],
-    [State('input-delete-node', 'value'),
-     State('graph-output', 'elements'),
-     State('session-data', 'data')],
+    [Output('my-mental-health-map', 'elements', allow_duplicate=True),
+     Output('edit-edge', 'options', allow_duplicate=True),
+     Output('edit-map-data', 'data', allow_duplicate=True)],
+    [Input('btn-minus-node', 'n_clicks')],
+    [State('edit-node', 'value'),
+     State('my-mental-health-map', 'elements'),
+     State('edit-map-data', 'data')],
      prevent_initial_call=True
 )
-def delete_node(n_clicks, node_id, elements, session_data):
+def delete_node(n_clicks, node_id, elements, edit_map_data):
     if n_clicks and node_id:
-        elements = [node for node in elements if node['data'].get('id') != node_id]
+        # Remove the node
+        elements = [element for element in elements if element['data'].get('id') != node_id]
+
+        # Remove edges connected to the node
+        elements = [element for element in elements if not (('source' in element['data'] and element['data']['source'] == node_id) or ('target' in element['data'] and element['data']['target'] == node_id))]
 
     # Extract all node names
     node_names = [node['data']['id'] for node in elements if 'id' in node['data'] and len(node['data']['id']) < 30]
-    session_data['add-nodes'] = node_names
+    edit_map_data['add-nodes'] = node_names
+    edit_map_data['elements'] = elements
 
-    return elements, node_names, node_names, session_data
+    return elements, node_names, edit_map_data
 
-# Callback: Restrict add and delete edge dropdowns to max 2 values
+# Callback: Limit dropdown for edit-edge to 2
 @app.callback(
-    Output('input-add-edge', 'value'),
-    Input('input-add-edge', 'value')
+    Output('edit-edge', 'value'),
+    Input('edit-edge', 'value')
 )
-def limit_dropdown_add_edge(add_edge):
-    if add_edge and len(add_edge) > 2:
-        return add_edge[:2]
-    return add_edge
-
-@app.callback(
-    Output('input-delete-edge', 'value'),
-    Input('input-delete-edge', 'value')
-)
-def limit_dropdown_delete_edge(delete_edge):
-    if delete_edge and len(delete_edge) > 2:
-        return delete_edge[:2]
-    return delete_edge
+def limit_dropdown_edit_edge(edit_edge):
+    if edit_edge and len(edit_edge) > 2:
+        return edit_edge[:2]
+    return edit_edge
 
 # Callback: Add additional edge to graph
 @app.callback(
-    [Output('graph-output', 'elements', allow_duplicate=True),
-     Output('session-data', 'data', allow_duplicate=True)],
-    [Input('btn-add-edge', 'n_clicks')],
-    [State('input-add-edge', 'value'),
-     State('graph-output', 'elements'),
-     State('session-data', 'data')],
+    [Output('my-mental-health-map', 'elements', allow_duplicate=True),
+     Output('edit-map-data', 'data', allow_duplicate=True)],
+    [Input('btn-plus-edge', 'n_clicks')],
+    [State('edit-edge', 'value'),
+     State('my-mental-health-map', 'elements'),
+     State('edit-map-data', 'data')],
      prevent_initial_call=True
 )
-
-def add_edge_output(n_clicks, new_edge, elements, session_data):
-    if n_clicks and new_edge:
+def add_edge_output(n_clicks, new_edge, elements, edit_map_data):
+    if n_clicks and new_edge and len(new_edge) == 2:
         source = new_edge[0]
         target = new_edge[1]
-        existing_edges = set(session_data['edges'])
+        existing_edges = set(edit_map_data['edges'])
         add_edge(source, target, elements, existing_edges)
-        session_data['edges'] = list(existing_edges)
-    return elements, session_data
+        edit_map_data['edges'] = list(existing_edges)
+        edit_map_data['elements'] = elements
+    return elements, edit_map_data
 
 # Callback: Delete existing edge from graph
 @app.callback(
-    [Output('graph-output', 'elements', allow_duplicate=True),
-     Output('session-data', 'data', allow_duplicate=True)],
-    [Input('btn-delete-edge', 'n_clicks')],
-    [State('input-delete-edge', 'value'),
-     State('graph-output', 'elements'),
-     State('session-data', 'data')],
+    [Output('my-mental-health-map', 'elements', allow_duplicate=True),
+     Output('edit-map-data', 'data', allow_duplicate=True)],
+    [Input('btn-minus-edge', 'n_clicks')],
+    [State('edit-edge', 'value'),
+     State('my-mental-health-map', 'elements'),
+     State('edit-map-data', 'data')],
      prevent_initial_call=True
 )
-
-def delete_edge_output(n_clicks, edge, elements, session_data):
-    if n_clicks and edge:
+def delete_edge_output(n_clicks, edge, elements, edit_map_data):
+    if n_clicks and edge and len(edge) == 2:
         source = edge[0]
         target = edge[1]
-        existing_edges = set(session_data['edges'])
+        existing_edges = set(edit_map_data['edges'])
         delete_edge(source, target, elements, existing_edges)
-        session_data['edges'] = list(existing_edges)
-    return elements, session_data
+        edit_map_data['edges'] = list(existing_edges)
+        edit_map_data['elements'] = elements
+    return elements, edit_map_data
 
-# Callback: Update session data based on graph output when clicking 'Save' button
+# Callback: Listens to color scheme user input (not working***)
+@app.callback(
+    [Output('my-mental-health-map', 'elements', allow_duplicate=True),
+     Output('edit-map-data', 'data', allow_duplicate=True)],
+    [Input('color-scheme', 'value')],
+    [State('my-mental-health-map', 'elements'),
+     State('edit-map-data', 'data')],
+     prevent_initial_call=True
+)
+def set_color_scheme(selected_scheme, elements, edit_map_data):
+    # Update the color scheme based on the selected option
+    if selected_scheme:
+        edit_map_data = color_scheme(selected_scheme, edit_map_data)
 
+    # Update elements with the new stylesheet
+    elements = edit_map_data['elements']
 
-# INCLUDE GRAPH INFORMATION IN SESSION-DATA (**)
-# Button - re-calculate centrality triggering session-data (**)
+    return elements, edit_map_data
 
-# 'DOWNLOAD' OPTION
+# Callback: Listens to node sizing user input
+
+# Implement default color and default size
+# Set static default graph layout 
+
 # INLCUDE MAP IN HOME TAB (**)
 # PROGRESS BAR
-
-# Callback: If user clicks on 'load PsySys map', populate graph with session_data
 
 if __name__ == '__main__':
     app.run_server(debug=True, port=8069)
