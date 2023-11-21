@@ -1,6 +1,8 @@
 # Current Version mental-health map tab
 
-from constants import factors, node_color, node_size
+from constants import factors, node_color, node_size, toggle
+from functions import generate_step_content, create_mental_health_map_tab, create_likert_scale, create_iframe, create_dropdown
+from functions import map_add_chains, map_add_cycles, map_add_factors, add_edge, delete_edge, graph_color, color_scheme, node_sizing
 
 # Import libraries
 import dash
@@ -22,606 +24,505 @@ import base64
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP,'https://use.fontawesome.com/releases/v5.8.1/css/all.css'],suppress_callback_exceptions=True)
 app.title = "PsySys"
 
-# Initialize factor list
-# factors = ["Loss of interest", "Feeling down", "Stress", "Worry", "Overthinking", "Sleep problems", 
-#            "Joint pain", "Changes in appetite", "Self-blame", "Trouble concentrating", "Procrastinating", 
-#            "Breakup", "Problems at work", "Interpersonal problems"]
+# # Function: Embed YouTube video 
+# def create_iframe(src):
+#     return html.Iframe(
+#         width="615",
+#         height="346",
+#         src=src,
+#         allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture;fullscreen"
+#     )
 
-# # Initialize node color schemes
-# node_color = ["Out-degree centrality", "In-degree centrality", "Out-/In-degree centrality"]
+# # Function: Create dropdown menu 
+# def create_dropdown(id, options, value, placeholder, multi=True):
+#     return dcc.Dropdown(
+#         id=id,
+#         options=options,
+#         value=value,
+#         placeholder=placeholder,
+#         multi=multi,
+#         style={'width': '81.5%'}
+#     )
 
-# # Initialize node sizing schemes
-# node_size = ["Out-degree centrality", "In-degree centrality", "Out-/In-degree centrality"] 
+# # Function: Generate likert scales to indicate factor severity
+# def create_likert_scale(factor, initial_value=0):
+#     return html.Div([
+#         html.Label([
+#             'Severity of ',
+#             html.Span(factor, style={'font-weight': 'bold', 'color': 'black'})
+#         ]),
+#         dcc.Slider(
+#             min=0,
+#             max=10,
+#             step=1,
+#             value=initial_value,
+#             marks={i: str(i) for i in range(11)},
+#             id={'type': 'likert-scale', 'factor': factor}
+#         )
+#     ])
 
-# Function: Embed YouTube video 
-def create_iframe(src):
-    return html.Iframe(
-        width="615",
-        height="346",
-        src=src,
-        allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture;fullscreen"
-    )
+# # Function: Generate step content based on session data
+# def generate_step_content(step, session_data):
 
-# Function: Create dropdown menu 
-def create_dropdown(id, options, value, placeholder, multi=True):
-    return dcc.Dropdown(
-        id=id,
-        options=options,
-        value=value,
-        placeholder=placeholder,
-        multi=multi,
-        style={'width': '81.5%'}
-    )
-
-# Function: Generate likert scales to indicate factor severity
-def create_likert_scale(factor, initial_value=0):
-    return html.Div([
-        html.Label([
-            'Severity of ',
-            html.Span(factor, style={'font-weight': 'bold', 'color': 'black'})
-        ]),
-        dcc.Slider(
-            min=0,
-            max=10,
-            step=1,
-            value=initial_value,
-            marks={i: str(i) for i in range(11)},
-            id={'type': 'likert-scale', 'factor': factor}
-        )
-    ])
-
-# Callback to dynamically generate Likert scales
-# @app.callback(
-#     Output('likert-scales-container', 'children'),
-#     [Input({'type': 'dynamic-dropdown', 'step': 1}, 'value'),
-#     Input('severity-scores', 'data')]
-# )
-# def update_likert_scales(selected_factors, severity_scores):
-#     # Check if session_data and severity_scores exist
-#     #severity_scores = severity_scores
-
-#     if selected_factors is None:
-#         return []
-
-#     # Create Likert scales with stored values or default to 0
-#     return [create_likert_scale(factor, severity_scores.get(factor, 0)) for factor in selected_factors]
-
-@app.callback(
-    Output('likert-scales-container', 'children'),
-    [Input({'type': 'dynamic-dropdown', 'step': 1}, 'value'),
-    Input('severity-scores', 'data')]
-)
-def update_likert_scales(selected_factors, severity_scores):
-    if severity_scores is None:
-        severity_scores = {}
-
-    if selected_factors is None:
-        return []
-
-    return [create_likert_scale(factor, severity_scores.get(factor, 0)) for factor in selected_factors]
-
-# Callback: Update severity scores
-@app.callback(
-    Output('severity-scores', 'data'),
-    [Input({'type': 'likert-scale', 'factor': ALL}, 'value')],
-    State('session-data', 'data')
-)
-def update_severity_scores(severity_values, session_data):
-    # Update the severity scores in session_data
-    severity_scores = {}
-    factors = session_data['dropdowns']['initial-selection']['value']
-    if factors and len(severity_values) != 0:
-        severity_scores = {factor: value for factor, value in zip(factors, severity_values)}
-    else:
-        return dash.no_update
-    #print(factors)
-    #print(severity_values)
-    #print(severity_scores)
-    return severity_scores
-
-# Function: Generate step content based on session data
-def generate_step_content(step, session_data):
-
-    if step == 0:
-        return html.Div([
-            html.Br(), html.Br(), html.Br(),
-            create_iframe("https://www.youtube.com/embed/d8ZZyuESXcU?si=CYvKNlf17wnzt4iG"),
-            html.Br(), html.Br(),
-            html.P("Please watch this video and begin with the PsySys session.")
-        ])
+#     if step == 0:
+#         return html.Div([
+#             html.Br(), html.Br(), html.Br(),
+#             create_iframe("https://www.youtube.com/embed/d8ZZyuESXcU?si=CYvKNlf17wnzt4iG"),
+#             html.Br(), html.Br(),
+#             html.P("Please watch this video and begin with the PsySys session.")
+#         ])
     
-    if step == 1:
-        options = session_data['dropdowns']['initial-selection']['options']
-        value = session_data['dropdowns']['initial-selection']['value']
-        id = {'type': 'dynamic-dropdown', 'step': 1}
-        text = 'Select factors'
-        return html.Div([
-            html.Br(), html.Br(), html.Br(),
-            create_iframe("https://www.youtube.com/embed/ttLzT4U2F2I?si=xv1ETjdc1uGROZTo"),
-            html.Br(), html.Br(),
-            html.P("Please watch the video. Below choose the factors you are currently dealing with."),
-            create_dropdown(id=id, options=options, value=value, placeholder=text),
-            html.Br(),
-            html.Div(id='likert-scales-container'),
-            html.Br()
-        ])
+#     if step == 1:
+#         options = session_data['dropdowns']['initial-selection']['options']
+#         value = session_data['dropdowns']['initial-selection']['value']
+#         id = {'type': 'dynamic-dropdown', 'step': 1}
+#         text = 'Select factors'
+#         return html.Div([
+#             html.Br(), html.Br(), html.Br(),
+#             create_iframe("https://www.youtube.com/embed/ttLzT4U2F2I?si=xv1ETjdc1uGROZTo"),
+#             html.Br(), html.Br(),
+#             html.P("Please watch the video. Below choose the factors you are currently dealing with."),
+#             create_dropdown(id=id, options=options, value=value, placeholder=text),
+#             html.Br(),
+#             html.Div(id='likert-scales-container'),
+#             html.Br()
+#         ])
 
-    if step == 2:
-        selected_factors = session_data['dropdowns']['initial-selection']['value'] or []
-        options = [{'label': factor, 'value': factor} for factor in selected_factors]
-        value_chain1 = session_data['dropdowns']['chain1']['value']
-        value_chain2 = session_data['dropdowns']['chain2']['value']
-        id_chain1 = {'type': 'dynamic-dropdown', 'step': 2}
-        id_chain2 = {'type': 'dynamic-dropdown', 'step': 3}
-        text = 'Select two factors'
-        return html.Div([
-            html.Br(), html.Br(), html.Br(),
-            create_iframe("https://www.youtube.com/embed/stqJRtjIPrI?si=1MI5daW_ldY3aQz3"),
-            html.Br(), html.Br(),
-            html.P("Please watch the video. Below indicate two causal relations you recognize."),
-            html.P("Example: If you feel that normally worrying causes you to become less concentrated, select these factors below in this order.", style={'width': '70%', 'font-style': 'italic', 'color': 'grey'}),
-            create_dropdown(id=id_chain1, options=options, value=value_chain1, placeholder=text),
-            html.Br(),
-            create_dropdown(id=id_chain2, options=options, value=value_chain2, placeholder=text),
-            html.Br()
-        ])
+#     if step == 2:
+#         selected_factors = session_data['dropdowns']['initial-selection']['value'] or []
+#         options = [{'label': factor, 'value': factor} for factor in selected_factors]
+#         value_chain1 = session_data['dropdowns']['chain1']['value']
+#         value_chain2 = session_data['dropdowns']['chain2']['value']
+#         id_chain1 = {'type': 'dynamic-dropdown', 'step': 2}
+#         id_chain2 = {'type': 'dynamic-dropdown', 'step': 3}
+#         text = 'Select two factors'
+#         return html.Div([
+#             html.Br(), html.Br(), html.Br(),
+#             create_iframe("https://www.youtube.com/embed/stqJRtjIPrI?si=1MI5daW_ldY3aQz3"),
+#             html.Br(), html.Br(),
+#             html.P("Please watch the video. Below indicate two causal relations you recognize."),
+#             html.P("Example: If you feel that normally worrying causes you to become less concentrated, select these factors below in this order.", style={'width': '70%', 'font-style': 'italic', 'color': 'grey'}),
+#             create_dropdown(id=id_chain1, options=options, value=value_chain1, placeholder=text),
+#             html.Br(),
+#             create_dropdown(id=id_chain2, options=options, value=value_chain2, placeholder=text),
+#             html.Br()
+#         ])
     
-    if step == 3:
-        selected_factors = session_data['dropdowns']['initial-selection']['value'] or []
-        options = [{'label': factor, 'value': factor} for factor in selected_factors]
-        value_cycle1 = session_data['dropdowns']['cycle1']['value']
-        value_cycle2 = session_data['dropdowns']['cycle2']['value']
-        id_cycle1 = {'type': 'dynamic-dropdown', 'step': 4}
-        id_cycle2 = {'type': 'dynamic-dropdown', 'step': 5}
-        text1 = 'Select two factors that reinforce each other'
-        text2 = 'Select three factors that reiforce each other'
-        return html.Div([
-            html.Br(), html.Br(), html.Br(),
-            create_iframe('https://www.youtube.com/embed/EdwiSp3BdKk?si=TcqeWxAlGl-_NUfx'),
-            html.Br(), html.Br(),
-            html.P("Please watch the video. Below indicate your vicious cycles. You can choose one containing two factors and another one containing three.", style={'width': '70%'}),
-            create_dropdown(id=id_cycle1, options=options, value=value_cycle1, placeholder=text1),
-            html.Br(),
-            create_dropdown(id=id_cycle2, options=options, value=value_cycle2, placeholder=text2),
-            html.Br()
-        ])
+#     if step == 3:
+#         selected_factors = session_data['dropdowns']['initial-selection']['value'] or []
+#         options = [{'label': factor, 'value': factor} for factor in selected_factors]
+#         value_cycle1 = session_data['dropdowns']['cycle1']['value']
+#         value_cycle2 = session_data['dropdowns']['cycle2']['value']
+#         id_cycle1 = {'type': 'dynamic-dropdown', 'step': 4}
+#         id_cycle2 = {'type': 'dynamic-dropdown', 'step': 5}
+#         text1 = 'Select two factors that reinforce each other'
+#         text2 = 'Select three factors that reiforce each other'
+#         return html.Div([
+#             html.Br(), html.Br(), html.Br(),
+#             create_iframe('https://www.youtube.com/embed/EdwiSp3BdKk?si=TcqeWxAlGl-_NUfx'),
+#             html.Br(), html.Br(),
+#             html.P("Please watch the video. Below indicate your vicious cycles. You can choose one containing two factors and another one containing three.", style={'width': '70%'}),
+#             create_dropdown(id=id_cycle1, options=options, value=value_cycle1, placeholder=text1),
+#             html.Br(),
+#             create_dropdown(id=id_cycle2, options=options, value=value_cycle2, placeholder=text2),
+#             html.Br()
+#         ])
     
-    if step == 4:
-        selected_factors = session_data['dropdowns']['initial-selection']['value'] or []
-        options = [{'label': factor, 'value': factor} for factor in selected_factors]
-        value_target = session_data['dropdowns']['target']['value']
-        id = {'type': 'dynamic-dropdown', 'step': 6}
-        text = 'Select one factor'
-        return html.Div([
-            html.Br(), html.Br(), html.Br(),
-            create_iframe('https://www.youtube.com/embed/hwisVnJ0y88?si=OpCWAMaDwTThocO6'),
-            html.Br(), html.Br(),
-            html.P("Please watch the video. Below indicate the factor you feel is the most influential one in your mental-health map.", style={'width': '70%'}),
-            create_dropdown(id=id, options=options, value=value_target, placeholder=text),
-            html.Br()
-        ])
+#     if step == 4:
+#         selected_factors = session_data['dropdowns']['initial-selection']['value'] or []
+#         options = [{'label': factor, 'value': factor} for factor in selected_factors]
+#         value_target = session_data['dropdowns']['target']['value']
+#         id = {'type': 'dynamic-dropdown', 'step': 6}
+#         text = 'Select one factor'
+#         return html.Div([
+#             html.Br(), html.Br(), html.Br(),
+#             create_iframe('https://www.youtube.com/embed/hwisVnJ0y88?si=OpCWAMaDwTThocO6'),
+#             html.Br(), html.Br(),
+#             html.P("Please watch the video. Below indicate the factor you feel is the most influential one in your mental-health map.", style={'width': '70%'}),
+#             create_dropdown(id=id, options=options, value=value_target, placeholder=text),
+#             html.Br()
+#         ])
 
-    if step == 5:
-        elements = session_data.get('elements', [])
-        selected_factors = session_data['add-nodes'] or []
-        options = [{'label': factor, 'value': factor} for factor in selected_factors]
-        return html.Div([
-            html.Div([
-                # Graph Container
-                html.Div([
-                    cyto.Cytoscape(
-                        id='graph-output',
-                        elements=session_data['elements'],
-                        layout={'name': 'cose', 'fit': True, 'padding': 10},
-                        zoom=1,
-                        pan={'x': 200, 'y': 200},
-                        stylesheet = session_data['stylesheet'],
-                        style={'width': '90%', 'height': '480px'}
-                    )
-                ], style={'flex': '1'}),
-                ], style={'display': 'flex', 'height': '470px', 'alignItems': 'flex-start', 'marginTop': '80px'}),
-                html.Br(),
-                ])
+#     if step == 5:
+#         elements = session_data.get('elements', [])
+#         selected_factors = session_data['add-nodes'] or []
+#         options = [{'label': factor, 'value': factor} for factor in selected_factors]
+#         return html.Div([
+#             html.Div([
+#                 # Graph Container
+#                 html.Div([
+#                     cyto.Cytoscape(
+#                         id='graph-output',
+#                         elements=session_data['elements'],
+#                         layout={'name': 'cose', 'fit': True, 'padding': 10},
+#                         zoom=1,
+#                         pan={'x': 200, 'y': 200},
+#                         stylesheet = session_data['stylesheet'],
+#                         style={'width': '90%', 'height': '480px'}
+#                     )
+#                 ], style={'flex': '1'}),
+#                 ], style={'display': 'flex', 'height': '470px', 'alignItems': 'flex-start', 'marginTop': '80px'}),
+#                 html.Br(),
+#                 ])
     
-    else:
-        return None
+#     else:
+#         return None
 
-# Function: Create my-mental-health-map editing tab
-def create_mental_health_map_tab(edit_map_data):
-    options = [{'label': factor, 'value': factor} for factor in factors]
-    color_schemes = [{'label': color, 'value': color} for color in node_color]
-    sizing_schemes = [{'label': size, 'value': size} for size in node_size]
-    return html.Div([
-        html.Br(),
-        html.Br(),
-        # html.H3("My Mental-Health Map"),
-        html.Div([
-            html.Div([
-                cyto.Cytoscape(
-                    id='my-mental-health-map',
-                    elements=edit_map_data['elements'],
-                    layout={'name': 'cose', 'fit': True, 'padding': 10},
-                    zoom=1,
-                    pan={'x': 200, 'y': 200},
-                    stylesheet=edit_map_data['stylesheet'],
-                    style={'width': '90%', 'height': '480px'}
-                ),
-                html.Br(),
-                html.Div([
-                    dbc.Button("Load PsySys Map", id='load-map-btn', className="me-2"),
-                    # Style the dcc.Upload component to look like a button
-                    dcc.Upload(
-                        id='upload-data',
-                        children=dbc.Button("Upload Map", id='upload-map-btn'),
-                        style={
-                            'display': 'inline-block',
-                        },
-                    ),
-                ], style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '5px'}),
+# # Function: Create my-mental-health-map editing tab
+# def create_mental_health_map_tab(edit_map_data, sizing_scheme_data):
+#     options = [{'label': factor, 'value': factor} for factor in factors]
+#     color_schemes = [{'label': color, 'value': color} for color in node_color]
+#     sizing_schemes = [{'label': size, 'value': size} for size in node_size]
+#     return html.Div([
+#         html.Br(),
+#         html.Br(),
+#         # html.H3("My Mental-Health Map"),
+#         html.Div([
+#             html.Div([
+#                 cyto.Cytoscape(
+#                     id='my-mental-health-map',
+#                     elements=edit_map_data['elements'],
+#                     layout={'name': 'cose', 'fit': True, 'padding': 10},
+#                     zoom=1,
+#                     pan={'x': 200, 'y': 200},
+#                     stylesheet=edit_map_data['stylesheet'],
+#                     style={'width': '90%', 'height': '480px'}
+#                 ),
+#                 html.Br(),
+#                 html.Div([
+#                     dbc.Button("Load PsySys Map", id='load-map-btn', className="me-2"),
+#                     # Style the dcc.Upload component to look like a button
+#                     dcc.Upload(
+#                         id='upload-data',
+#                         children=dbc.Button("Upload Map", id='upload-map-btn'),
+#                         style={
+#                             'display': 'inline-block',
+#                         },
+#                     ),
+#                 ], style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '5px'}),
                 
-                html.Div([
-                    dbc.Button("Download as File ", id='download-file-btn', className="me-2"),
-                    dbc.Button("Download as Image", id='download-image-btn')
-                ], style={'display': 'flex', 'marginTop': '10px', 'gap': '5px'})
-            ], style={'flex': '1'}),
+#                 html.Div([
+#                     dbc.Button("Download as File ", id='download-file-btn', className="me-2"),
+#                     dbc.Button("Download as Image", id='download-image-btn')
+#                 ], style={'display': 'flex', 'marginTop': '10px', 'gap': '5px'})
+#             ], style={'flex': '1'}),
 
-            # Editing features
-            html.Div([
-                html.Div([
-                    dbc.Input(id='edit-node', type='text', placeholder='Enter factor', style={'marginRight': '10px', 'borderRadius': '10px'}),
-                    dbc.Button("➕", id='btn-plus-node', color="primary", style={'marginRight': '5px'}),
-                    dbc.Button("➖", id='btn-minus-node', color="danger")
-                ], style={'display': 'flex', 'alignItems': 'right', 'marginBottom': '10px'}),
+#             # Editing features
+#             html.Div([
+#                 html.Div([
+#                     dbc.Input(id='edit-node', type='text', placeholder='Enter factor', style={'marginRight': '10px', 'borderRadius': '10px'}),
+#                     dbc.Button("➕", id='btn-plus-node', color="primary", style={'marginRight': '5px'}),
+#                     dbc.Button("➖", id='btn-minus-node', color="danger")
+#                 ], style={'display': 'flex', 'alignItems': 'right', 'marginBottom': '10px'}),
 
-                html.Div([
-                    dcc.Dropdown(id='edit-edge', options=options, placeholder='Enter connection', multi=True, style={'width': '96%', 'borderRadius': '10px'}),
-                    dbc.Button("➕", id='btn-plus-edge', color="primary", style={'marginRight': '5px'}),
-                    dbc.Button("➖", id='btn-minus-edge', color="danger")
-                ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'}),
+#                 html.Div([
+#                     dcc.Dropdown(id='edit-edge', options=options, placeholder='Enter connection', multi=True, style={'width': '96%', 'borderRadius': '10px'}),
+#                     dbc.Button("➕", id='btn-plus-edge', color="primary", style={'marginRight': '5px'}),
+#                     dbc.Button("➖", id='btn-minus-edge', color="danger")
+#                 ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'}),
             
-                html.Div([
-                    dcc.Dropdown(id='color-scheme', options=color_schemes, placeholder='Select a color scheme', multi=False, style={'width': '96%', 'borderRadius': '10px'})
-                ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'}),
+#                 html.Div([
+#                     dcc.Dropdown(id='color-scheme', options=color_schemes, value=sizing_scheme_data, placeholder='Select a color scheme', multi=False, style={'width': '96%', 'borderRadius': '10px'})
+#                 ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'}),
 
-                html.Div([
-                    dcc.Dropdown(id='sizing-scheme', options=sizing_schemes, placeholder='Select a sizing scheme', multi=False, style={'width': '96%', 'borderRadius': '10px'})
-                ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'})
+#                 html.Div([
+#                     dcc.Dropdown(id='sizing-scheme', options=sizing_schemes, placeholder='Select a sizing scheme', multi=False, style={'width': '96%', 'borderRadius': '10px'})
+#                 ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'})
 
-            ], style={'width': '300px', 'padding': '10px', 'marginTop': '80px'})
+#             ], style={'width': '300px', 'padding': '10px', 'marginTop': '80px'})
         
-        ], style={'display': 'flex', 'height': '470px', 'alignItems': 'flex-start'}),
-    ])
+#         ], style={'display': 'flex', 'height': '470px', 'alignItems': 'flex-start'}),
+#     ])
 
-# Function: Initiate graph with elements
-def map_add_factors(session_data):
-    selected_factors = session_data['dropdowns']['initial-selection']['value'] or []
-    map_elements = [{'data': {'id': factor, 'label': factor}} for factor in selected_factors]
-    session_data['elements'] = map_elements
-    return session_data
+# # Function: Initiate graph with elements
+# def map_add_factors(session_data):
+#     selected_factors = session_data['dropdowns']['initial-selection']['value'] or []
+#     map_elements = [{'data': {'id': factor, 'label': factor}} for factor in selected_factors]
+#     session_data['elements'] = map_elements
+#     return session_data
 
-# Function: Add an edge 
-def add_edge(source, target, elements, existing_edges):
-        edge_key = f"{source}->{target}"
-        if edge_key not in existing_edges:
-            elements.append({'data': {'source': source, 'target': target}})
-            existing_edges.add(edge_key)
-            return elements, existing_edges
+# # Function: Add an edge 
+# def add_edge(source, target, elements, existing_edges):
+#         edge_key = f"{source}->{target}"
+#         if edge_key not in existing_edges:
+#             elements.append({'data': {'source': source, 'target': target}})
+#             existing_edges.add(edge_key)
+#             return elements, existing_edges
         
-# Function: Delete an edge
-def delete_edge(source, target, elements, existing_edges):
-    edge_key = f"{source}->{target}"
-    if edge_key in existing_edges:
-        for i in range(len(elements) - 1, -1, -1):
-            if elements[i].get('data', {}).get('source') == source and elements[i].get('data', {}).get('target') == target:
-                del elements[i]
-                break
-        existing_edges.remove(edge_key)
-    return elements, existing_edges
+# # Function: Delete an edge
+# def delete_edge(source, target, elements, existing_edges):
+#     edge_key = f"{source}->{target}"
+#     if edge_key in existing_edges:
+#         for i in range(len(elements) - 1, -1, -1):
+#             if elements[i].get('data', {}).get('source') == source and elements[i].get('data', {}).get('target') == target:
+#                 del elements[i]
+#                 break
+#         existing_edges.remove(edge_key)
+#     return elements, existing_edges
 
-# Function: Include causal chains into the map  
-def map_add_chains(session_data):
-    map_elements = session_data['elements']
-    chain1_elements = session_data['dropdowns']['chain1']['value']
-    chain2_elements = session_data['dropdowns']['chain2']['value']
-    existing_edges = set(session_data['edges'])
-    if chain1_elements and len(chain1_elements) == 2:
-        add_edge(chain1_elements[0], chain1_elements[1], map_elements, existing_edges)
-    if chain2_elements and len(chain2_elements) == 2:
-        add_edge(chain2_elements[0], chain2_elements[1], map_elements, existing_edges)
-    session_data['elements'] = map_elements
-    session_data['edges'] = list(existing_edges)
-    return session_data, existing_edges
+# # Function: Include causal chains into the map  
+# def map_add_chains(session_data):
+#     map_elements = session_data['elements']
+#     chain1_elements = session_data['dropdowns']['chain1']['value']
+#     chain2_elements = session_data['dropdowns']['chain2']['value']
+#     existing_edges = set(session_data['edges'])
+#     if chain1_elements and len(chain1_elements) == 2:
+#         add_edge(chain1_elements[0], chain1_elements[1], map_elements, existing_edges)
+#     if chain2_elements and len(chain2_elements) == 2:
+#         add_edge(chain2_elements[0], chain2_elements[1], map_elements, existing_edges)
+#     session_data['elements'] = map_elements
+#     session_data['edges'] = list(existing_edges)
+#     return session_data, existing_edges
 
-# Function: Add vicious cycles into the map 
-def map_add_cycles(session_data):
-    map_elements = session_data['elements']
-    cycle1_elements = session_data['dropdowns']['cycle1']['value']
-    cycle2_elements = session_data['dropdowns']['cycle2']['value']
-    existing_edges = set(session_data['edges'])
-    if cycle1_elements and len(cycle1_elements) == 2:
-        add_edge(cycle1_elements[0], cycle1_elements[1], map_elements, existing_edges)
-        add_edge(cycle1_elements[1], cycle1_elements[0], map_elements, existing_edges)
-    if cycle2_elements and len(cycle2_elements) == 3:
-        add_edge(cycle2_elements[0], cycle2_elements[1], map_elements, existing_edges)
-        add_edge(cycle2_elements[1], cycle2_elements[2], map_elements, existing_edges)
-        add_edge(cycle2_elements[2], cycle2_elements[0], map_elements, existing_edges)
-    session_data['elements'] = map_elements
-    session_data['edges'] = list(existing_edges)
-    return session_data
+# # Function: Add vicious cycles into the map 
+# def map_add_cycles(session_data):
+#     map_elements = session_data['elements']
+#     cycle1_elements = session_data['dropdowns']['cycle1']['value']
+#     cycle2_elements = session_data['dropdowns']['cycle2']['value']
+#     existing_edges = set(session_data['edges'])
+#     if cycle1_elements and len(cycle1_elements) == 2:
+#         add_edge(cycle1_elements[0], cycle1_elements[1], map_elements, existing_edges)
+#         add_edge(cycle1_elements[1], cycle1_elements[0], map_elements, existing_edges)
+#     if cycle2_elements and len(cycle2_elements) == 3:
+#         add_edge(cycle2_elements[0], cycle2_elements[1], map_elements, existing_edges)
+#         add_edge(cycle2_elements[1], cycle2_elements[2], map_elements, existing_edges)
+#         add_edge(cycle2_elements[2], cycle2_elements[0], map_elements, existing_edges)
+#     session_data['elements'] = map_elements
+#     session_data['edges'] = list(existing_edges)
+#     return session_data
 
-# Function: Normalize        
-def normalize(value, max_degree, min_degree):
-    value = float(value)
-    if max_degree - min_degree == 0:
-        return 0.5  
-    return (value - min_degree) / (max_degree - min_degree)
+# # Function: Normalize        
+# def normalize(value, max_degree, min_degree):
+#     value = float(value)
+#     if max_degree - min_degree == 0:
+#         return 0.5  
+#     return (value - min_degree) / (max_degree - min_degree)
 
-# Function: Color gradient
-def get_color(value):
-    b = 255
-    r = int(173 * (1 - value))
-    g = int(216 * (1 - value))
-    return r, g, b
+# # Function: Color gradient
+# def get_color(value):
+#     b = 255
+#     r = int(173 * (1 - value))
+#     g = int(216 * (1 - value))
+#     return r, g, b
 
-# Function: Calculate degree centrality
-def calculate_degree_centrality(elements, degrees):
-    for element in elements:
-        if 'source' in element['data']:
-            source = element['data']['source']
-            degrees[source]['out'] = degrees[source].get('out', 0) + 1
-        if 'target' in element['data']:
-            target = element['data']['target']
-            degrees[target]['in'] = degrees[target].get('in', 0) + 1
-    return elements, degrees
+# # Function: Calculate degree centrality
+# def calculate_degree_centrality(elements, degrees):
+#     for element in elements:
+#         if 'source' in element['data']:
+#             source = element['data']['source']
+#             degrees[source]['out'] = degrees[source].get('out', 0) + 1
+#         if 'target' in element['data']:
+#             target = element['data']['target']
+#             degrees[target]['in'] = degrees[target].get('in', 0) + 1
+#     return elements, degrees
 
-# Function: Color depending on degree centrality
-## (1) Out-degree centrality (most active), 
-## (2) In-degree centrality (most passive), 
-## (3) Out-/In-degree centrality (most influential - combining Out- and in- info)
-
-# def color_scheme(type, graph_data):
+# # Function: Color depending on degree centrality and severity
+# def color_scheme(type, graph_data, severity_scores):
 #     elements = graph_data['elements']
 #     stylesheet = graph_data['stylesheet']
-#     degrees = {element['data']['id']: {'out': 0, 'in': 0} for element in 
-#                elements if 'id' in element['data']}
-    
-#     # Calculate in-degree and out-degree
-#     elements, degrees = calculate_degree_centrality(elements, degrees)
 
-#     # Compute centrality based on the selected type
-#     computed_degrees = {}
-#     for id, degree_counts in degrees.items():
-#         if type == "Out-degree centrality":
-#             computed_degrees[id] = degree_counts['out']
-#         elif type == "In-degree centrality":
-#             computed_degrees[id] = degree_counts['in']
-#         elif type == "Out-/In-degree centrality":
-#             if degree_counts['in'] != 0:
-#                 computed_degrees[id] = degree_counts['out'] / degree_counts['in']
-#             else:
-#                 computed_degrees[id] = 0  # or some other default value you deem appropriate
+#     if type == "Severity" :
+#         if severity_scores != {}:
+#             print(severity_scores)
+#             max_severity = max(severity_scores.values())
+#             min_severity = min(severity_scores.values())
+#             normalized_severity_scores = {node: normalize(severity, max_severity, min_severity) for node, severity in severity_scores.items()}
 
-#     if computed_degrees:
-#         min_degree = min(computed_degrees.values())
-#         max_degree = max(computed_degrees.values())
+#             # Create a color map based on normalized severity scores
+#             color_map = {node: get_color(value) for node, value in normalized_severity_scores.items()}
+            
+#             # Update the stylesheet based on the severity color map
+#             for node, color in color_map.items():
+#                 r, g, b = color
+#                 stylesheet.append({
+#                     'selector': f'node[id="{node}"]',
+#                     'style': {
+#                         'background-color': f'rgb({r},{g},{b})'
+#                     }
+#                 })
+#         elif severity_scores == {}:
+#             return graph_data
+#     elif type == 'Severity (abs)':
+#         if severity_scores != {}:
+#             max_severity = 10
+#             min_severity = 0
+#             normalized_severity_scores = {node: normalize(severity, max_severity, min_severity) for node, severity in severity_scores.items()}
+
+#             # Create a color map based on normalized severity scores
+#             color_map = {node: get_color(value) for node, value in normalized_severity_scores.items()}
+            
+#             # Update the stylesheet based on the severity color map
+#             for node, color in color_map.items():
+#                 r, g, b = color
+#                 stylesheet.append({
+#                     'selector': f'node[id="{node}"]',
+#                     'style': {
+#                         'background-color': f'rgb({r},{g},{b})'
+#                     }
+#                 })
+#         elif severity_scores == {}:
+#             return graph_data
 #     else:
-#         min_degree = 0
-#         max_degree = 1
+#         degrees = {element['data']['id']: {'out': 0, 'in': 0} for element in 
+#                    elements if 'id' in element['data']}
 
-#     # Normalizing the degrees
-#     normalized_degrees = {node: normalize(degree, max_degree, min_degree) for node, degree in computed_degrees.items()}
+#         # Calculate in-degree and out-degree
+#         elements, degrees = calculate_degree_centrality(elements, degrees)
 
-#     # Create a color map based on normalized degrees
-#     color_map = {node: get_color(value) for node, value in normalized_degrees.items()}
+#         # Compute centrality based on the selected type
+#         computed_degrees = {}
+#         for id, degree_counts in degrees.items():
+#             if type == "Out-degree centrality":
+#                 computed_degrees[id] = degree_counts['out']
+#             elif type == "In-degree centrality":
+#                 computed_degrees[id] = degree_counts['in']
+#             elif type == "Out-/In-degree centrality":
+#                 if degree_counts['in'] != 0:
+#                     computed_degrees[id] = degree_counts['out'] / degree_counts['in']
+#                 else:
+#                     computed_degrees[id] = 0  # or some other default value you deem appropriate
 
-#     # Update the stylesheet
-#     for node, color in color_map.items():
-#         r, g, b = color
-#         stylesheet.append({
-#             'selector': f'node[id="{node}"]',
-#             'style': {
-#                 'background-color': f'rgb({r},{g},{b})'
-#             }
-#         })
-    
+#         if computed_degrees:
+#             min_degree = min(computed_degrees.values())
+#             max_degree = max(computed_degrees.values())
+#         else:
+#             min_degree = 0
+#             max_degree = 1
+
+#         # Normalizing the degrees
+#         normalized_degrees = {node: normalize(degree, max_degree, min_degree) for node, degree in computed_degrees.items()}
+
+#         # Create a color map based on normalized degrees
+#         color_map = {node: get_color(value) for node, value in normalized_degrees.items()}
+
+#         # Update the stylesheet
+#         for node, color in color_map.items():
+#             r, g, b = color
+#             stylesheet.append({
+#                 'selector': f'node[id="{node}"]',
+#                 'style': {
+#                     'background-color': f'rgb({r},{g},{b})'
+#                 }
+#             })
+
 #     graph_data['stylesheet'] = stylesheet  # Corrected the assignment operator
-    
+
 #     return graph_data
 
-# Function: Color depending on degree centrality and severity
-def color_scheme(type, graph_data, severity_scores):
-    elements = graph_data['elements']
-    stylesheet = graph_data['stylesheet']
+# # Function: Adjust node sizes
+# def normalize_size(value, max_value, min_value, min_size, max_size):
+#     # Normalize the value to a range between min_size and max_size
+#     normalized = (value - min_value) / (max_value - min_value)
+#     return normalized * (max_size - min_size) + min_size
 
-    if type == "Severity" and severity_scores is not None:
-        max_severity = max(severity_scores.values())
-        min_severity = min(severity_scores.values())
-        normalized_severity_scores = {node: normalize(severity, max_severity, min_severity) for node, severity in severity_scores.items()}
+# def node_sizing(type, graph_data, severity):
+#     max_size = 50
+#     min_size = 10
 
-        # Create a color map based on normalized severity scores
-        color_map = {node: get_color(value) for node, value in normalized_severity_scores.items()}
+#     elements = graph_data['elements']
+#     stylesheet = graph_data['stylesheet']
+
+#     if type == "Severity":
+#         if severity != {}:
+#             max_severity = max(severity.values())
+#             min_severity = min(severity.values())
         
-        # Update the stylesheet based on the severity color map
-        for node, color in color_map.items():
-            r, g, b = color
-            stylesheet.append({
-                'selector': f'node[id="{node}"]',
-                'style': {
-                    'background-color': f'rgb({r},{g},{b})'
-                }
-            })
-    elif type == 'Severity (abs)' and severity_scores is not None:
-        max_severity = 10
-        min_severity = 0
-        normalized_severity_scores = {node: normalize(severity, max_severity, min_severity) for node, severity in severity_scores.items()}
+#             for node_id, severity_value in severity.items():
+#                 size = normalize_size(severity_value, max_severity, min_severity, min_size, max_size)
+#                 stylesheet.append({
+#                     'selector': f'node[id="{node_id}"]',
+#                     'style': {
+#                         'width': size,
+#                         'height': size
+#                     }
+#                 })
+#         elif severity == {}:
+#             return graph_data
 
-        # Create a color map based on normalized severity scores
-        color_map = {node: get_color(value) for node, value in normalized_severity_scores.items()}
+#     elif type == 'Severity (abs)':
+#         if severity != {}:
+#             max_severity = 10
+#             min_severity = 0
         
-        # Update the stylesheet based on the severity color map
-        for node, color in color_map.items():
-            r, g, b = color
-            stylesheet.append({
-                'selector': f'node[id="{node}"]',
-                'style': {
-                    'background-color': f'rgb({r},{g},{b})'
-                }
-            })
-    else:
-        degrees = {element['data']['id']: {'out': 0, 'in': 0} for element in 
-                   elements if 'id' in element['data']}
+#             for node_id, severity in severity.items():
+#                 size = normalize_size(severity, max_severity, min_severity, min_size, max_size)
+#                 stylesheet.append({
+#                     'selector': f'node[id="{node_id}"]',
+#                     'style': {
+#                         'width': size,
+#                         'height': size
+#                     }
+#                 })
+#         elif severity == {}:
+#             return graph_data
 
-        # Calculate in-degree and out-degree
-        elements, degrees = calculate_degree_centrality(elements, degrees)
+#     else:
+#         degrees = {element['data']['id']: {'out': 0, 'in': 0} for element in 
+#                 elements if 'id' in element['data']}
 
-        # Compute centrality based on the selected type
-        computed_degrees = {}
-        for id, degree_counts in degrees.items():
-            if type == "Out-degree centrality":
-                computed_degrees[id] = degree_counts['out']
-            elif type == "In-degree centrality":
-                computed_degrees[id] = degree_counts['in']
-            elif type == "Out-/In-degree centrality":
-                if degree_counts['in'] != 0:
-                    computed_degrees[id] = degree_counts['out'] / degree_counts['in']
-                else:
-                    computed_degrees[id] = 0  # or some other default value you deem appropriate
+#         # Calculate in-degree and out-degree
+#         elements, degrees = calculate_degree_centrality(elements, degrees)
 
-        if computed_degrees:
-            min_degree = min(computed_degrees.values())
-            max_degree = max(computed_degrees.values())
-        else:
-            min_degree = 0
-            max_degree = 1
+#         computed_degrees = {}
+#         for node_id, degree_counts in degrees.items():
+#             if type == "Out-degree centrality":
+#                 computed_degrees[node_id] = degree_counts['out']
+#             elif type == "In-degree centrality":
+#                 computed_degrees[node_id] = degree_counts['in']
+#             elif type == "Out-/In-degree centrality":
+#                 computed_degrees[node_id] = degree_counts['out'] / degree_counts['in'] if degree_counts['in'] != 0 else 0
 
-        # Normalizing the degrees
-        normalized_degrees = {node: normalize(degree, max_degree, min_degree) for node, degree in computed_degrees.items()}
+#         if computed_degrees:
+#             min_degree = min(computed_degrees.values())
+#             max_degree = max(computed_degrees.values())
+#         else:
+#             min_degree = 0
+#             max_degree = 1
 
-        # Create a color map based on normalized degrees
-        color_map = {node: get_color(value) for node, value in normalized_degrees.items()}
+#         # Set node sizes based on normalized degrees
+#         for node_id, degree in computed_degrees.items():
+#             size = normalize_size(degree, max_degree, min_degree, min_size, max_size)
+#             stylesheet.append({
+#                 'selector': f'node[id="{node_id}"]',
+#                 'style': {
+#                     'width': size,
+#                     'height': size
+#                 }
+#             })
 
-        # Update the stylesheet
-        for node, color in color_map.items():
-            r, g, b = color
-            stylesheet.append({
-                'selector': f'node[id="{node}"]',
-                'style': {
-                    'background-color': f'rgb({r},{g},{b})'
-                }
-            })
+#         graph_data['stylesheet'] = stylesheet
+#         return graph_data
 
-    graph_data['stylesheet'] = stylesheet  # Corrected the assignment operator
+# # Function: Color most influential fator in graph 
+# def color_target(graph_data):
+#     influential_factor = graph_data['dropdowns']['target']['value']
+#     stylesheet = graph_data['stylesheet']
 
-    return graph_data
-
-# Function: Adjust node sizes
-def normalize_size(value, max_value, min_value, min_size, max_size):
-    # Normalize the value to a range between min_size and max_size
-    normalized = (value - min_value) / (max_value - min_value)
-    return normalized * (max_size - min_size) + min_size
-
-def node_sizing(type, graph_data, severity):
-    max_size = 50
-    min_size = 10
-
-    elements = graph_data['elements']
-    stylesheet = graph_data['stylesheet']
-
-    if type == "Severity" and severity is not None:
-        max_severity = max(severity.values())
-        min_severity = min(severity.values())
-       
-        for node_id, severity_value in severity.items():
-            size = normalize_size(severity_value, max_severity, min_severity, min_size, max_size)
-            stylesheet.append({
-                'selector': f'node[id="{node_id}"]',
-                'style': {
-                    'width': size,
-                    'height': size
-                }
-            })
-
-    elif type == 'Severity (abs)' and severity is not None:
-        max_severity = 10
-        min_severity = 0
-       
-        for node_id, severity in severity.items():
-            size = normalize_size(severity, max_severity, min_severity, min_size, max_size)
-            stylesheet.append({
-                'selector': f'node[id="{node_id}"]',
-                'style': {
-                    'width': size,
-                    'height': size
-                }
-            })
-
-    else:
-        degrees = {element['data']['id']: {'out': 0, 'in': 0} for element in 
-                elements if 'id' in element['data']}
-
-        # Calculate in-degree and out-degree
-        elements, degrees = calculate_degree_centrality(elements, degrees)
-
-        computed_degrees = {}
-        for node_id, degree_counts in degrees.items():
-            if type == "Out-degree centrality":
-                computed_degrees[node_id] = degree_counts['out']
-            elif type == "In-degree centrality":
-                computed_degrees[node_id] = degree_counts['in']
-            elif type == "Out-/In-degree centrality":
-                computed_degrees[node_id] = degree_counts['out'] / degree_counts['in'] if degree_counts['in'] != 0 else 0
-
-        if computed_degrees:
-            min_degree = min(computed_degrees.values())
-            max_degree = max(computed_degrees.values())
-        else:
-            min_degree = 0
-            max_degree = 1
-
-        # Set node sizes based on normalized degrees
-        for node_id, degree in computed_degrees.items():
-            size = normalize_size(degree, max_degree, min_degree, min_size, max_size)
-            stylesheet.append({
-                'selector': f'node[id="{node_id}"]',
-                'style': {
-                    'width': size,
-                    'height': size
-                }
-            })
-
-        graph_data['stylesheet'] = stylesheet
-        return graph_data
-
-# Function: Color most influential fator in graph 
-def color_target(graph_data):
-    influential_factor = graph_data['dropdowns']['target']['value']
-    stylesheet = graph_data['stylesheet']
-
-    if influential_factor:
-        stylesheet.append({'selector': f'node[id = "{influential_factor[0]}"]',
-                           'style': {'border-color': 'red','border-width': '2px'}})
+#     if influential_factor:
+#         stylesheet.append({'selector': f'node[id = "{influential_factor[0]}"]',
+#                            'style': {'border-color': 'red','border-width': '2px'}})
         
-    graph_data['stylesheet'] = stylesheet
-    return graph_data
+#     graph_data['stylesheet'] = stylesheet
+#     return graph_data
 
-def reset_target(graph_data):
-    stylesheet = graph_data['stylesheet']
-    new_stylesheet = [style for style in stylesheet 
-                      if not (style.get('style', {}).get('border-color') == 'red')]
-    graph_data['stylesheet'] = new_stylesheet
-    return graph_data
+# def reset_target(graph_data):
+#     stylesheet = graph_data['stylesheet']
+#     new_stylesheet = [style for style in stylesheet 
+#                       if not (style.get('style', {}).get('border-color') == 'red')]
+#     graph_data['stylesheet'] = new_stylesheet
+#     return graph_data
 
-# Function: Color graph (out-degree centrality, target node)
-def graph_color(session_data, severity_scores):
+# # Function: Color graph (out-degree centrality, target node)
+# def graph_color(session_data, severity_scores):
 
-    # Add influential node style
-    #session_data = color_scheme(type="Severity", graph_data=session_data, severity_scores=severity_scores)
-    session_data = reset_target(session_data)
-    session_data = color_target(session_data)
+#     # Add influential node style
+#     #session_data = color_scheme(type="Severity", graph_data=session_data, severity_scores=severity_scores)
+#     session_data = reset_target(session_data)
+#     session_data = color_target(session_data)
 
-    session_data = node_sizing(type="Severity", graph_data=session_data, severity=severity_scores)
+#     session_data = node_sizing(type="Severity", graph_data=session_data, severity=severity_scores)
 
-    return session_data
+#     return session_data
 
 # Define style to initiate components
 hidden_style = {'display': 'none'}
@@ -692,6 +593,8 @@ stylesheet = [{'selector': 'node','style': {'background-color': 'blue', 'label':
 app.layout = dbc.Container([
     dbc.Row([nav_col, content_col]),
     dcc.Store(id='current-step', data={'step': 0}, storage_type='local'),
+    dcc.Store(id='color_scheme', data=None),
+    dcc.Store(id='sizing_scheme', data=None),
     html.Div(id='hidden-div', style={'display': 'none'}),
     dcc.Store(id='session-data', data={
         'dropdowns': {
@@ -742,9 +645,11 @@ home_page = html.Div([
     [Input('url', 'pathname'),
      Input('edit-map-data', 'data'),  # Add this input
      Input('current-step', 'data')],
-    [State('session-data', 'data')]
+    [State('session-data', 'data'),
+     State('color_scheme', 'data'),
+     State('sizing_scheme', 'data')]
 )
-def update_page_and_buttons(pathname, edit_map_data, current_step_data, session_data):
+def update_page_and_buttons(pathname, edit_map_data, current_step_data, session_data, color, sizing):
     step = current_step_data.get('step', 0)  # Default to step 0 if not found
 
     # Default button states
@@ -774,7 +679,7 @@ def update_page_and_buttons(pathname, edit_map_data, current_step_data, session_
             next_button_text = "Redo"         # Change text to "Redo"
 
     elif pathname == "/my-mental-health-map":
-        content = create_mental_health_map_tab(edit_map_data)
+        content = create_mental_health_map_tab(edit_map_data, color, sizing)
         back_button_style = hidden_style
         next_button_style = hidden_style
 
@@ -934,8 +839,6 @@ def upload_graph(contents, filename):
         return data
     return dash.no_update
 
-# Callback: Download network as image ***
-
 # Callback: Edit map - add node
 @app.callback(
     [Output('my-mental-health-map', 'elements'),
@@ -1053,13 +956,11 @@ def delete_edge_output(n_clicks, edge, elements, edit_map_data):
 )
 def set_color_scheme(selected_scheme, stylesheet, edit_map_data, severity_scores):
     # Update the color scheme based on the selected option
-    #print(edit_map_data['elements'])
     if selected_scheme:
         edit_map_data = color_scheme(selected_scheme, edit_map_data, severity_scores)
 
     # Update elements with the new stylesheet
     stylesheet = edit_map_data['stylesheet']
-    #print(edit_map_data['stylesheet'])
 
     return stylesheet, edit_map_data
 
@@ -1074,7 +975,6 @@ def set_color_scheme(selected_scheme, stylesheet, edit_map_data, severity_scores
     prevent_initial_call=True
 )
 def set_node_sizes(selected_scheme, stylesheet, edit_map_data, severity_scores):
-    print(severity_scores)
     if selected_scheme and edit_map_data and severity_scores is not None:
         edit_map_data = node_sizing(type=selected_scheme, graph_data=edit_map_data, severity=severity_scores)
 
@@ -1088,7 +988,213 @@ def set_node_sizes(selected_scheme, stylesheet, edit_map_data, severity_scores):
     else:
         return dash.no_update
 
+# Callback: Dynamically generate Likert scales
+@app.callback(
+    Output('likert-scales-container', 'children'),
+    [Input({'type': 'dynamic-dropdown', 'step': 1}, 'value'),
+    Input('severity-scores', 'data')]
+)
+def update_likert_scales(selected_factors, severity_scores):
+    if severity_scores is None:
+        severity_scores = {}
+
+    if selected_factors is None:
+        return []
+
+    return [create_likert_scale(factor, severity_scores.get(factor, 0)) for factor in selected_factors]
+
+# Callback: Update severity scores
+@app.callback(
+    Output('severity-scores', 'data'),
+    [Input({'type': 'likert-scale', 'factor': ALL}, 'value')],
+    State('session-data', 'data')
+)
+def update_severity_scores(severity_values, session_data):
+    severity_scores = {}
+    factors = session_data['dropdowns']['initial-selection']['value']
+    if factors and len(severity_values) != 0:
+        severity_scores = {factor: value for factor, value in zip(factors, severity_values)}
+    else:
+        return dash.no_update
+    return severity_scores
+
+# Callback: Update color_scheme dropdown value
+@app.callback(
+    Output('color_scheme', 'data'),
+    Input('color-scheme', 'value')
+)
+def update_color_scheme_dropdown(value):
+    return value
+
+# Callback: Update sizing_scheme dropdown value
+@app.callback(
+    Output('sizing_scheme', 'data'),
+    Input('sizing-scheme', 'value')
+)
+def update_sizing_scheme_dropdown(value):
+    return value
+
+# Callback: Inspect node (highlight direct effects) upon clicking
+# @app.callback(
+#     Output('my-mental-health-map', 'stylesheet', allow_duplicate=True),
+#     [Input('my-mental-health-map', 'tapNodeData'),
+#      Input('my-mental-health-map', 'tap')],
+#     State('edit-map-data', 'data'),
+#     prevent_initial_call=True
+# )
+# def update_stylesheet(tapNodeData, tap, edit_map_data):
+#     ctx = dash.callback_context
+#     default_stylesheet = edit_map_data['stylesheet']
+#     elements = edit_map_data['elements']
+
+#     if ctx.triggered and ctx.triggered[0]['prop_id'] == 'my-mental-health-map.tapNodeData':
+#         node_data = tapNodeData
+#         if not node_data:
+#             return default_stylesheet
+
+#         clicked_node_id = node_data['id']
+#         # Find outgoing edges from the clicked node
+#         outgoing_edges = [e for e in elements if e.get('data', {}).get('source') == clicked_node_id]
+#         # Find target nodes of these edges
+#         target_node_ids = {e['data']['target'] for e in outgoing_edges}
+
+#         # Adjust the stylesheet for highlighting
+#         new_stylesheet = []
+#         for style in default_stylesheet:
+#             selector = style.get('selector')
+#             if selector.startswith('node') or selector.startswith('edge'):
+#                 # Reduce opacity for all nodes and edges initially
+#                 style_copy = style.copy()
+#                 style_copy['style'] = style_copy.get('style', {}).copy()
+#                 style_copy['style']['opacity'] = '0.2'
+#                 new_stylesheet.append(style_copy)
+
+#         # Highlight the clicked node, its outgoing edges, and target nodes
+#         new_stylesheet.extend([
+#             {'selector': f'node[id = "{clicked_node_id}"]', 'style': {'opacity': '1'}},
+#             {'selector': ','.join([f'node[id = "{n_id}"]' for n_id in target_node_ids]), 'style': {'opacity': '1'}},
+#             {'selector': ','.join([f'edge[source = "{clicked_node_id}"][target = "{e["data"]["target"]}"]' for e in outgoing_edges]), 'style': {'opacity': '1'}}
+#         ])
+
+#         return new_stylesheet
+
+#     elif ctx.triggered and ctx.triggered[0]['prop_id'] == 'my-mental-health-map.tap':
+#         return default_stylesheet
+
+#     return default_stylesheet
+
+@app.callback(
+    Output('my-mental-health-map', 'stylesheet'),
+    [Input('my-mental-health-map', 'tapNodeData'),
+     Input('mode-toggle', 'value')],
+    State('edit-map-data', 'data')
+)
+def update_stylesheet(tapNodeData, mode, edit_map_data):
+    default_stylesheet = edit_map_data['stylesheet']
+    elements = edit_map_data['elements']
+
+    # Reset to default if in view mode
+    if mode == 'view':
+        return default_stylesheet
+
+    # If in inspect mode and a node is clicked
+    if mode == 'inspect' and tapNodeData:
+        clicked_node_id = tapNodeData['id']
+        # Find outgoing edges from the clicked node
+        outgoing_edges = [e for e in elements if e.get('data', {}).get('source') == clicked_node_id]
+        # Find target nodes of these edges
+        target_node_ids = {e['data']['target'] for e in outgoing_edges}
+
+        # Adjust the stylesheet for highlighting
+        new_stylesheet = []
+        for style in default_stylesheet:
+            selector = style.get('selector')
+            if 'node' in selector or 'edge' in selector:
+                # Reduce opacity for all nodes and edges initially
+                style['style']['opacity'] = '0.2'
+                new_stylesheet.append(style)
+
+        # Highlight the clicked node, its outgoing edges, and target nodes
+        new_stylesheet.extend([
+            {'selector': f'node[id = "{clicked_node_id}"]', 'style': {'opacity': '1'}},
+            {'selector': ','.join([f'node[id = "{n_id}"]' for n_id in target_node_ids]), 'style': {'opacity': '1'}},
+            {'selector': ','.join([f'edge[source = "{clicked_node_id}"][target = "{e["data"]["target"]}"]' for e in outgoing_edges]), 'style': {'opacity': '1'}}
+        ])
+
+        return new_stylesheet
+    # Return default if no node is clicked or if mode is not 'inspect'
+    return default_stylesheet
+
+
+# Callback: Node annotation
+
+# Callback: Download network as image ***
+
+# Node annotation (**)
+# Inspect node functionality (**)
+
+# Schemes including newly added nodes & edges
 # Set static default graph layout 
+# edges gone 
+
+# Information
+@app.callback(
+    Output('modal-color-scheme', 'is_open'),
+    [Input('help-color', 'n_clicks')],
+    [State('modal-color-scheme', 'is_open')],
+)
+def toggle_modal_color(n_clicks, is_open):
+    if n_clicks:
+        return not is_open
+    return is_open
+
+@app.callback(
+    Output('modal-color-scheme-body', 'children'),
+    [Input('color-scheme', 'value')]
+)
+def update_modal_content_color(selected_scheme):
+    if selected_scheme == 'Uniform':
+        return 'All the factors in your map have the same color.'
+    if selected_scheme == 'Severity':
+        return 'The factors in your map are colored based on their relative severity. The darkest factor has the highest indicated severity and the lightest factor has lowest indicated severity.'
+    elif selected_scheme == 'Severity (abs)':
+        return 'The factors in your map are colored based on their absolute severity. The darkest factor has the highest possible severity score (10) and the lightest factor has the lowest possible severity score (0).'
+    elif selected_scheme == 'Out-degree':
+        return 'The factors in your map are colored based on their out-degree, which refers to the number of out-going connections. The darkest factor has the most out-going connections and the lightest factor has the least out-going connections. Factors with a lot of out-going connections can be seen as main causes in your map.'
+    elif selected_scheme == 'In-degree':
+        return 'The factors in your map are colored based on their in-degree, which refers to the number of incoming connections. The darkest factor has the most incoming connections and the lightest factor has the least incoming connections. Factors with a lot of incoming connections can be seen as main effects in your map.'
+    elif selected_scheme == 'Out-/In-degree ratio':
+        return 'The factors in your map are colored based on their out-/in-degree ratio, which is calculated by dividing the number of out-going by the number of incoming connections. The darkest factor has many out-going and few incoming connections (active), and the lightest factor has few out-going and many incoming connections (passive).'
+    return 'As a default the factors in your map are uniformly colored.'
+
+@app.callback(
+    Output('modal-sizing-scheme', 'is_open'),
+    [Input('help-size', 'n_clicks')],
+    [State('modal-sizing-scheme', 'is_open')],
+)
+def toggle_modal_sizing(n_clicks, is_open):
+    if n_clicks:
+        return not is_open
+    return is_open
+
+@app.callback(
+    Output('modal-sizing-scheme-body', 'children'),
+    [Input('sizing-scheme', 'value')]
+)
+def update_modal_content_sizing(selected_scheme):
+    if selected_scheme == 'Uniform':
+        return 'All factors in your map have the same size.'
+    if selected_scheme == 'Severity':
+        return 'The size of the factors in your map corresponds to their relative severity. The largest factor has the highest indicated severity and the smallest factor has lowest indicated severity.'
+    elif selected_scheme == 'Severity (abs)':
+        return 'The size of the factors in your map corresponds to their absolute severity. The largest factor has the highest possible severity score (10) and the smallest factor has the lowest possible severity score (0).'
+    elif selected_scheme == 'Out-degree':
+        return 'The size of the factors in your map corresponds to their out-degree, which refers to the number of out-going connections. The largest factor has the most out-going connections and the smallest factor has the least out-going connections. Factors with a lot of out-going connections can be seen as main causes in your map.'
+    elif selected_scheme == 'In-degree':
+        return 'The size of the factors in your map corresponds to their in-degree, which refers to the number of incoming connections. The largest factor has the most incoming connections and the smallest factor has the least incoming connections. Factors with a lot of incoming connections can be seen as main effects in your map.'
+    elif selected_scheme == 'Out-/In-degree ratio':
+        return 'The size of the factors in your map corresponds to their out-/in-degree ratio, which is calculated by dividing the number of out-going by the number of incoming connections. The largest factor has many out-going and few incoming connections (active), and the smallest factor has few out-going and many incoming connections (passive).'
+    return 'As a default the size of the factors in your map corresponds to their relative severity. The largest factor has the highest indicated severity and the smallest factor has lowest indicated severity.'
 
 # INLCUDE MAP IN HOME TAB (**)
 # PROGRESS BAR

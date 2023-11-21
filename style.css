@@ -1,0 +1,37 @@
+style.css
+.sidebar {
+    height: 100vh; /* Full height */
+    position: fixed; /* Fixed, to stay in place during page scroll */
+    right: 0; /* Align to the right side */
+    top: 0; /* Align to the top */
+    overflow-x: hidden; /* Hide horizontal overflow */
+    transition: width 0.5s; /* Smooth transition for width */
+}
+
+.sidebar-collapsed {
+    width: 50px; /* Width of the sidebar when collapsed */
+}
+
+.sidebar-expanded {
+    width: 250px; /* Width of the sidebar when expanded */
+}
+
+.content-container {
+    transition: margin-right 0.5s; /* Smooth transition for margin */
+    /* Other styling for content */
+}
+
+.content-container-expanded {
+    margin-right: 250px; /* Adjust the margin to match the expanded sidebar */
+}
+
+.radio-group {
+    padding-left: 0px; /* Adjust the padding to move the group to the left */
+}
+
+/* Specific styles for your toggle */
+.btn-check:checked + .btn-outline-primary {
+    color: #fff;
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
