@@ -564,7 +564,8 @@ nav_col = dbc.Col(
             [
                 dbc.NavLink("Home", href="/", active="exact"),
                 dbc.NavLink("Psychoeducation", href="/psysys-session", active="exact"),
-                dbc.NavLink("My Map", href="/my-mental-health-map", active="exact")
+                dbc.NavLink("Edit My Map", href="/my-mental-health-map", active="exact"),
+                dbc.NavLink("Track My Map", href="/track-my-mental-health-map", active="exact")
             ],
             vertical=True,
             pills=True,
@@ -592,9 +593,9 @@ stylesheet = [{'selector': 'node','style': {'background-color': 'blue', 'label':
 # Define app layout
 app.layout = dbc.Container([
     dbc.Row([nav_col, content_col]),
-    dcc.Store(id='current-step', data={'step': 0}, storage_type='local'),
-    dcc.Store(id='color_scheme', data=None),
-    dcc.Store(id='sizing_scheme', data=None),
+    dcc.Store(id='current-step', data={'step': 0}, storage_type='session'),
+    dcc.Store(id='color_scheme', data=None, storage_type='session'),
+    dcc.Store(id='sizing_scheme', data=None, storage_type='session'),
     html.Div(id='hidden-div', style={'display': 'none'}),
     dcc.Store(id='session-data', data={
         'dropdowns': {
@@ -956,7 +957,7 @@ def delete_edge_output(n_clicks, edge, elements, edit_map_data):
 )
 def set_color_scheme(selected_scheme, stylesheet, edit_map_data, severity_scores):
     # Update the color scheme based on the selected option
-    if selected_scheme:
+    if selected_scheme is not None and edit_map_data is not None and severity_scores is not None:
         edit_map_data = color_scheme(selected_scheme, edit_map_data, severity_scores)
 
     # Update elements with the new stylesheet
@@ -975,8 +976,8 @@ def set_color_scheme(selected_scheme, stylesheet, edit_map_data, severity_scores
     prevent_initial_call=True
 )
 def set_node_sizes(selected_scheme, stylesheet, edit_map_data, severity_scores):
-    if selected_scheme and edit_map_data and severity_scores is not None:
-        edit_map_data = node_sizing(type=selected_scheme, graph_data=edit_map_data, severity=severity_scores)
+    if selected_scheme is not None and edit_map_data is not None and severity_scores is not None:
+        edit_map_data = node_sizing(chosen_scheme=selected_scheme, graph_data=edit_map_data, severity_scores=severity_scores)
 
         # Update elements with the new stylesheet
         if 'stylesheet' in edit_map_data:

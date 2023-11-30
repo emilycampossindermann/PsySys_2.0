@@ -5,6 +5,7 @@ from dash import dcc, html
 from dash.dependencies import Input, Output, State, MATCH, ALL
 import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
+import copy
 
 # Function: Embed YouTube video 
 def create_iframe(src):
@@ -218,7 +219,7 @@ def create_mental_health_map_tab(edit_map_data, color_scheme_data, sizing_scheme
                     dbc.Button("❔", id='help-size', color="light", style={'marginRight': '0px'}),
                     dbc.Modal([dbc.ModalHeader("Node Size Information"),
                                dbc.ModalBody("Content explaining the color scheme will go here...", id='modal-sizing-scheme-body')
-                               ], id="modal-sizing-scheme"),
+                               ], id="modal-sizing-scheme", style={"display": "flex", "gap": "5px"}),
                 ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'}),
 
                 html.Br(),
@@ -323,191 +324,230 @@ def calculate_degree_centrality(elements, degrees):
             degrees[target]['in'] = degrees[target].get('in', 0) + 1
     return elements, degrees
 
-# Function: Color depending on degree centrality and severity
-def color_scheme(type, graph_data, severity_scores):
+# Function: Apply uniform color
+def apply_uniform_color_styles(stylesheet):
+    # Define the uniform color style for nodes
+    uniform_color_style = {
+        'selector': 'node',
+        'style': {
+            'background-color': 'blue',
+            'label': 'data(label)'  # Ensure labels are maintained
+        }
+    }
+    # Remove any existing node color styles
+    stylesheet = [style for style in stylesheet if 'background-color' not in style.get('style', {})]
+    # Append the uniform color style
+    stylesheet.append(uniform_color_style)
+    return stylesheet
+
+# Function: Apply severity color
+def apply_severity_color_styles(type, stylesheet, severity_scores, default_style):
+    # Check if severity_scores is not empty and valid
+    if severity_scores and all(isinstance(score, (int, float)) for score in severity_scores.values()):
+        if type == "Severity":
+            max_severity = max(severity_scores.values())
+            min_severity = min(severity_scores.values())
+        elif type == "Severity (abs)":
+            max_severity = 10
+            min_severity = 1
+
+        # Normalize and apply color based on severity
+        for node_id, severity in severity_scores.items():
+            normalized_severity = (severity - min_severity) / (max_severity - min_severity)
+            r, g, b = get_color(normalized_severity)  # Assuming get_color is defined as before
+
+            severity_style = {
+                'selector': f'node[id="{node_id}"]',
+                'style': {
+                    'background-color': f'rgb({r},{g},{b})'
+                }
+            }
+            # Append the style for this node
+            stylesheet.append(severity_style)
+
+    elif severity_scores == {}:
+        stylesheet = default_style
+
+    return stylesheet
+
+# Function: Apply degree centrality color
+def apply_centrality_color_styles(type, stylesheet, elements):
+    degrees = {element['data']['id']: {'out': 0, 'in': 0} for element in elements 
+               if 'id' in element['data']}
+    
+    # Calculate in-degree and out-degree
+    elements, degrees = calculate_degree_centrality(elements, degrees)
+
+    # Compute centrality based on the selected type
+    computed_degrees = {}
+    for id, degree_counts in degrees.items():
+        if type == "Out-degree":
+            computed_degrees[id] = degree_counts['out']
+        elif type == "In-degree":
+            computed_degrees[id] = degree_counts['in']
+        elif type == "Out-/In-degree ratio":
+            if degree_counts['in'] != 0:
+                computed_degrees[id] = degree_counts['out'] / degree_counts['in']
+            else:
+                computed_degrees[id] = 0  # or some other default value you deem appropriate
+    if computed_degrees:
+        min_degree = min(computed_degrees.values())
+        max_degree = max(computed_degrees.values())
+    else:
+        min_degree = 0
+        max_degree = 1
+
+    for node_id, degree in computed_degrees.items():
+        if max_degree != min_degree:
+            # Normalized degree value when max and min degrees are different
+            normalized_degree = (degree - min_degree) / (max_degree - min_degree)
+        else:
+            # Default normalized value when max and min degrees are the same
+            normalized_degree = 0.5  # or any default value that suits your application
+
+        r, g, b = get_color(normalized_degree)  # Assuming get_color is defined as before
+
+        degree_style = {
+            'selector': f'node[id="{node_id}"]',
+            'style': {
+                'background-color': f'rgb({r},{g},{b})'
+            }
+        }
+        # Append the style for this node
+        stylesheet.append(degree_style)
+
+    return stylesheet
+
+# Function: Set color scheme
+def color_scheme(chosen_scheme, graph_data, severity_scores):
     elements = graph_data['elements']
     stylesheet = graph_data['stylesheet']
     default_style = [{'selector': 'node','style': {'background-color': 'blue', 'label': 'data(label)'}},
                      {'selector': 'edge','style': {'curve-style': 'bezier', 'target-arrow-shape': 'triangle'}}]
     
-    if type == "Uniform":
-        graph_data['stylesheet'] = default_style
-        return graph_data
-    elif type == "Severity" :
-        if severity_scores != {}:
-            max_severity = max(severity_scores.values())
-            min_severity = min(severity_scores.values())
-            normalized_severity_scores = {node: normalize(severity, max_severity, min_severity) for node, severity in severity_scores.items()}
-
-            # Create a color map based on normalized severity scores
-            color_map = {node: get_color(value) for node, value in normalized_severity_scores.items()}
-            
-            # Update the stylesheet based on the severity color map
-            for node, color in color_map.items():
-                r, g, b = color
-                stylesheet.append({
-                    'selector': f'node[id="{node}"]',
-                    'style': {
-                        'background-color': f'rgb({r},{g},{b})'
-                    }
-                })
-        elif severity_scores == {}:
-            return graph_data
-    elif type == 'Severity (abs)':
-        if severity_scores != {}:
-            max_severity = 10
-            min_severity = 0
-            normalized_severity_scores = {node: normalize(severity, max_severity, min_severity) for node, severity in severity_scores.items()}
-
-            # Create a color map based on normalized severity scores
-            color_map = {node: get_color(value) for node, value in normalized_severity_scores.items()}
-            
-            # Update the stylesheet based on the severity color map
-            for node, color in color_map.items():
-                r, g, b = color
-                stylesheet.append({
-                    'selector': f'node[id="{node}"]',
-                    'style': {
-                        'background-color': f'rgb({r},{g},{b})'
-                    }
-                })
-        elif severity_scores == {}:
-            return graph_data
-    else:
-        degrees = {element['data']['id']: {'out': 0, 'in': 0} for element in 
-                   elements if 'id' in element['data']}
-
-        # Calculate in-degree and out-degree
-        elements, degrees = calculate_degree_centrality(elements, degrees)
-
-        # Compute centrality based on the selected type
-        computed_degrees = {}
-        for id, degree_counts in degrees.items():
-            if type == "Out-degree":
-                computed_degrees[id] = degree_counts['out']
-            elif type == "In-degree":
-                computed_degrees[id] = degree_counts['in']
-            elif type == "Out-/In-degree ratio":
-                if degree_counts['in'] != 0:
-                    computed_degrees[id] = degree_counts['out'] / degree_counts['in']
-                else:
-                    computed_degrees[id] = 0  # or some other default value you deem appropriate
-
-        if computed_degrees:
-            min_degree = min(computed_degrees.values())
-            max_degree = max(computed_degrees.values())
-        else:
-            min_degree = 0
-            max_degree = 1
-
-        # Normalizing the degrees
-        normalized_degrees = {node: normalize(degree, max_degree, min_degree) for node, degree in computed_degrees.items()}
-
-        # Create a color map based on normalized degrees
-        color_map = {node: get_color(value) for node, value in normalized_degrees.items()}
-
-        # Update the stylesheet
-        for node, color in color_map.items():
-            r, g, b = color
-            stylesheet.append({
-                'selector': f'node[id="{node}"]',
-                'style': {
-                    'background-color': f'rgb({r},{g},{b})'
-                }
-            })
-
-    graph_data['stylesheet'] = stylesheet  # Corrected the assignment operator
-
+    if chosen_scheme == "Uniform":
+        graph_data['stylesheet'] = apply_uniform_color_styles(graph_data['stylesheet'])
+    elif chosen_scheme in ["Severity", "Severity (abs)"]:
+        graph_data['stylesheet'] = apply_severity_color_styles(chosen_scheme, graph_data['stylesheet'], severity_scores, default_style)
+    elif chosen_scheme in ["Out-degree", "In-degree", "Out-/In-degree ratio"]:
+        graph_data['stylesheet'] = apply_centrality_color_styles(chosen_scheme, graph_data['stylesheet'], elements)
+    
     return graph_data
 
-# Function: Adjust node sizes
+# Function: Normalize size
 def normalize_size(value, max_value, min_value, min_size, max_size):
+    if max_value == min_value:
+        # If max and min values are equal, return the average size to avoid division by zero
+        return (max_size + min_size) / 2
+
     # Normalize the value to a range between min_size and max_size
     normalized = (value - min_value) / (max_value - min_value)
     return normalized * (max_size - min_size) + min_size
 
-def node_sizing(type, graph_data, severity):
+# Function: Apply uniform node sizing 
+def apply_uniform_size_styles(stylesheet):
+    # Define the uniform size style
+    uniform_size_style = {
+        'selector': 'node',
+        'style': {'width': 25, 'height': 25}  # Example sizes
+    }
+    # Apply this style to the stylesheet
+    stylesheet = [style for style in stylesheet if 'width' not in style.get('style', {})]
+    stylesheet.append(uniform_size_style)
+
+    return stylesheet
+
+# Function: Apply severity node sizing
+def apply_severity_size_styles(type, stylesheet, severity_scores, default_style):
+    # Check if severity_scores is not empty and valid
     max_size = 50
     min_size = 10
 
+    if severity_scores and all(isinstance(score, (int, float)) for score in severity_scores.values()):
+        if type == "Severity":
+            max_severity = max(severity_scores.values())
+            min_severity = min(severity_scores.values())
+        elif type == "Severity (abs)":
+            max_severity = 10
+            min_severity = 1
+
+        # Normalize and apply color based on severity
+        for node_id, severity in severity_scores.items():
+            size = normalize_size(severity, max_severity, min_severity, min_size, max_size)
+
+            severity_style = {
+                'selector': f'node[id="{node_id}"]',
+                'style': {'width': size,'height': size}
+                }
+            
+            # Append the style for this node
+            stylesheet.append(severity_style)
+
+    elif severity_scores == {}:
+        stylesheet = default_style
+        #return dash.no_update
+
+    return stylesheet
+
+# Function: Apply degree centraliy node sizing
+def apply_centrality_size_styles(type, stylesheet, elements):
+    max_size = 50
+    min_size = 10
+
+    degrees = {element['data']['id']: {'out': 0, 'in': 0} for element in elements 
+               if 'id' in element['data']}
+    
+    # Calculate in-degree and out-degree
+    elements, degrees = calculate_degree_centrality(elements, degrees)
+
+    # Compute centrality based on the selected type
+    computed_degrees = {}
+    for id, degree_counts in degrees.items():
+        if type == "Out-degree":
+            computed_degrees[id] = degree_counts['out']
+        elif type == "In-degree":
+            computed_degrees[id] = degree_counts['in']
+        elif type == "Out-/In-degree ratio":
+            if degree_counts['in'] != 0:
+                computed_degrees[id] = degree_counts['out'] / degree_counts['in']
+            else:
+                computed_degrees[id] = 0  # or some other default value you deem appropriate
+
+    if computed_degrees:
+        min_degree = min(computed_degrees.values())
+        max_degree = max(computed_degrees.values())
+    else:
+        min_degree = 0
+        max_degree = 1
+
+    for node_id, degree in computed_degrees.items():
+        size = normalize_size(degree, max_degree, min_degree, min_size, max_size)
+
+        degree_style = {
+            'selector': f'node[id="{node_id}"]',
+            'style': {'width': size, 'height': size}
+        }
+
+        # Append the style for this node
+        stylesheet.append(degree_style)
+
+    return stylesheet
+
+# Function: Set node sizing scheme 
+def node_sizing(chosen_scheme, graph_data, severity_scores):
     elements = graph_data['elements']
     stylesheet = graph_data['stylesheet']
     default_style = [{'selector': 'node','style': {'background-color': 'blue', 'label': 'data(label)'}},
                      {'selector': 'edge','style': {'curve-style': 'bezier', 'target-arrow-shape': 'triangle'}}]
-
-    if type == "Uniform":
-        graph_data['stylesheet'] = default_style
-        return graph_data
-    elif type == "Severity":
-        if severity != {}:
-            max_severity = max(severity.values())
-            min_severity = min(severity.values())
-        
-            for node_id, severity_value in severity.items():
-                size = normalize_size(severity_value, max_severity, min_severity, min_size, max_size)
-                stylesheet.append({
-                    'selector': f'node[id="{node_id}"]',
-                    'style': {
-                        'width': size,
-                        'height': size
-                    }
-                })
-        elif severity == {}:
-            return graph_data
-
-    elif type == 'Severity (abs)':
-        if severity != {}:
-            max_severity = 10
-            min_severity = 0
-        
-            for node_id, severity in severity.items():
-                size = normalize_size(severity, max_severity, min_severity, min_size, max_size)
-                stylesheet.append({
-                    'selector': f'node[id="{node_id}"]',
-                    'style': {
-                        'width': size,
-                        'height': size
-                    }
-                })
-        elif severity == {}:
-            return graph_data
-
-    else:
-        degrees = {element['data']['id']: {'out': 0, 'in': 0} for element in 
-                elements if 'id' in element['data']}
-
-        # Calculate in-degree and out-degree
-        elements, degrees = calculate_degree_centrality(elements, degrees)
-
-        computed_degrees = {}
-        for node_id, degree_counts in degrees.items():
-            if type == "Out-degree":
-                computed_degrees[node_id] = degree_counts['out']
-            elif type == "In-degree":
-                computed_degrees[node_id] = degree_counts['in']
-            elif type == "Out-/In-degree ratio":
-                computed_degrees[node_id] = degree_counts['out'] / degree_counts['in'] if degree_counts['in'] != 0 else 0
-
-        if computed_degrees:
-            min_degree = min(computed_degrees.values())
-            max_degree = max(computed_degrees.values())
-        else:
-            min_degree = 0
-            max_degree = 1
-
-        # Set node sizes based on normalized degrees
-        for node_id, degree in computed_degrees.items():
-            size = normalize_size(degree, max_degree, min_degree, min_size, max_size)
-            stylesheet.append({
-                'selector': f'node[id="{node_id}"]',
-                'style': {
-                    'width': size,
-                    'height': size
-                }
-            })
-
-        graph_data['stylesheet'] = stylesheet
-        return graph_data
+    
+    if chosen_scheme == "Uniform":
+        graph_data['stylesheet'] = apply_uniform_size_styles(graph_data['stylesheet'])
+    elif chosen_scheme in ["Severity", "Severity (abs)"]:
+        graph_data['stylesheet'] = apply_severity_size_styles(chosen_scheme, graph_data['stylesheet'], severity_scores, default_style)
+    elif chosen_scheme in ["Out-degree", "In-degree", "Out-/In-degree ratio"]:
+        graph_data['stylesheet'] = apply_centrality_size_styles(chosen_scheme, graph_data['stylesheet'], elements)
+    
+    return graph_data
 
 # Function: Color most influential fator in graph 
 def color_target(graph_data):
@@ -536,6 +576,6 @@ def graph_color(session_data, severity_scores):
     session_data = reset_target(session_data)
     session_data = color_target(session_data)
 
-    session_data = node_sizing(type="Severity", graph_data=session_data, severity=severity_scores)
+    session_data = node_sizing(chosen_scheme="Severity", graph_data=session_data, severity_scores=severity_scores)
 
     return session_data
