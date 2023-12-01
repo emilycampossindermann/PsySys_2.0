@@ -610,7 +610,8 @@ app.layout = dbc.Container([
         'edges': [],
         'add-nodes': [],
         'add-edges': [],
-        'stylesheet': stylesheet
+        'stylesheet': stylesheet,
+        'annotations': []
     }, storage_type='session'),
     dcc.Store(id='edit-map-data', data={
         'dropdowns': {
@@ -625,9 +626,11 @@ app.layout = dbc.Container([
         'edges': [],
         'add-nodes': [],
         'add-edges': [],
-        'stylesheet': stylesheet
+        'stylesheet': stylesheet,
+        'annotations': []
     }, storage_type='session'),
     dcc.Store(id='severity-scores', data={}, storage_type='session'),
+    dcc.Store(id='annotation-data', data={}),
     dcc.Download(id='download-link')
 ])
 
@@ -790,7 +793,8 @@ def reset(current_step_data):
             'edges': [],
             'add-nodes': [],
             'add-edges': [],
-            'stylesheet': stylesheet
+            'stylesheet': stylesheet,
+            'annotations': []
         }
         return (data,) 
 
@@ -965,7 +969,7 @@ def set_color_scheme(selected_scheme, stylesheet, edit_map_data, severity_scores
 
     return stylesheet, edit_map_data
 
-# Callback: Listens to node sizing user input (** not working)
+# Callback: Listens to node sizing user input 
 @app.callback(
     [Output('my-mental-health-map', 'stylesheet', allow_duplicate=True),
      Output('edit-map-data', 'data', allow_duplicate=True)],
@@ -1036,58 +1040,10 @@ def update_sizing_scheme_dropdown(value):
     return value
 
 # Callback: Inspect node (highlight direct effects) upon clicking
-# @app.callback(
-#     Output('my-mental-health-map', 'stylesheet', allow_duplicate=True),
-#     [Input('my-mental-health-map', 'tapNodeData'),
-#      Input('my-mental-health-map', 'tap')],
-#     State('edit-map-data', 'data'),
-#     prevent_initial_call=True
-# )
-# def update_stylesheet(tapNodeData, tap, edit_map_data):
-#     ctx = dash.callback_context
-#     default_stylesheet = edit_map_data['stylesheet']
-#     elements = edit_map_data['elements']
-
-#     if ctx.triggered and ctx.triggered[0]['prop_id'] == 'my-mental-health-map.tapNodeData':
-#         node_data = tapNodeData
-#         if not node_data:
-#             return default_stylesheet
-
-#         clicked_node_id = node_data['id']
-#         # Find outgoing edges from the clicked node
-#         outgoing_edges = [e for e in elements if e.get('data', {}).get('source') == clicked_node_id]
-#         # Find target nodes of these edges
-#         target_node_ids = {e['data']['target'] for e in outgoing_edges}
-
-#         # Adjust the stylesheet for highlighting
-#         new_stylesheet = []
-#         for style in default_stylesheet:
-#             selector = style.get('selector')
-#             if selector.startswith('node') or selector.startswith('edge'):
-#                 # Reduce opacity for all nodes and edges initially
-#                 style_copy = style.copy()
-#                 style_copy['style'] = style_copy.get('style', {}).copy()
-#                 style_copy['style']['opacity'] = '0.2'
-#                 new_stylesheet.append(style_copy)
-
-#         # Highlight the clicked node, its outgoing edges, and target nodes
-#         new_stylesheet.extend([
-#             {'selector': f'node[id = "{clicked_node_id}"]', 'style': {'opacity': '1'}},
-#             {'selector': ','.join([f'node[id = "{n_id}"]' for n_id in target_node_ids]), 'style': {'opacity': '1'}},
-#             {'selector': ','.join([f'edge[source = "{clicked_node_id}"][target = "{e["data"]["target"]}"]' for e in outgoing_edges]), 'style': {'opacity': '1'}}
-#         ])
-
-#         return new_stylesheet
-
-#     elif ctx.triggered and ctx.triggered[0]['prop_id'] == 'my-mental-health-map.tap':
-#         return default_stylesheet
-
-#     return default_stylesheet
-
 @app.callback(
     Output('my-mental-health-map', 'stylesheet'),
     [Input('my-mental-health-map', 'tapNodeData'),
-     Input('mode-toggle', 'value')],
+     Input('mode-toggle', 'value'),],
     State('edit-map-data', 'data')
 )
 def update_stylesheet(tapNodeData, mode, edit_map_data):
@@ -1127,16 +1083,135 @@ def update_stylesheet(tapNodeData, mode, edit_map_data):
     return default_stylesheet
 
 
-# Callback: Node annotation
+# Callback: Annotation - initialize graph element annotations when in mode
+@app.callback(
+    Output('annotation-data', 'data'),
+    Input('mode-toggle', 'value'),
+    [State('edit-map-data', 'data'),
+     State('annotation-data', 'data')],
+    prevent_initial_call=True
+)
+def initialize_annotations(mode, edit_map_data, annotation_data):
+    if mode == 'annotate':
+        elements = edit_map_data.get('elements', [])
+        # Check if annotations are already initialized
+        if not annotation_data:
+            annotation_data = {element['data']['id']: "hello" for element in elements if 'id' in element['data']}
+        return annotation_data
+    return dash.no_update
+
+# Callback: Annotation - display graph element annotations when in mode (tooltips)
+@app.callback(
+    Output('my-mental-health-map', 'stylesheet', allow_duplicate=True),
+    [Input('mode-toggle', 'value'),
+     Input('annotation-data', 'data')],
+    State('edit-map-data', 'data'),
+    prevent_initial_call=True
+)
+# def display_annotations_as_tooltips(mode, annotation_data, edit_map_data):
+#     default_stylesheet = edit_map_data.get('stylesheet', [])
+#     if mode == 'annotate':
+#         annotated_stylesheet = default_stylesheet.copy()
+#         for element in edit_map_data.get('elements', []):
+#             id = element['data'].get('id')
+#             annotation = annotation_data.get(id, "")
+#             selector = 'node' if 'source' not in element['data'] else 'edge'
+#             annotated_stylesheet.append({
+#                 'selector': f'{selector}[id="{id}"]',
+#                 'style': {
+#                     'content': annotation,
+#                     'text-valign': 'center',
+#                     'text-halign': 'right',
+#                     'font-size': 10
+#                 }
+#             })
+#         return annotated_stylesheet
+#     return default_stylesheet
+def display_annotations_as_tooltips(mode, annotation_data, edit_map_data):
+    default_stylesheet = edit_map_data.get('stylesheet', [])
+    if mode == 'annotate':
+        annotated_stylesheet = []
+        for element in default_stylesheet:
+            # Copy existing styles, but we'll override the 'color' property below
+            style_copy = element.copy()
+            annotated_stylesheet.append(style_copy)
+            
+        for element in edit_map_data.get('elements', []):
+            id = element['data'].get('id')
+            label = element['data'].get('label', '')
+            annotation = annotation_data.get(id, "")
+            # You may use '\n' to add a new line between the label and the annotation if needed
+            combined_content = f'{label} {annotation}' if annotation else label
+            color = 'orange' if annotation else '#000' # Default color if no annotation
+            # Apply the combined content and color
+            annotated_stylesheet.append({
+                'selector': f'node[id="{id}"], edge[id="{id}"]',
+                'style': {
+                    'content': combined_content,
+                    'color': color,
+                    'text-valign': 'center',
+                    'text-halign': 'center',
+                    'font-size': 10  # Adjust as needed
+                }
+            })
+        return annotated_stylesheet
+    return default_stylesheet
+
+# Callback: Annotation - display textfield when clicking on node/edge in mode
+@app.callback(
+    [Output('annotation-input', 'style'),
+     Output('save-annotation-btn', 'style'),
+     Output('annotation-input', 'value')],
+    [Input('mode-toggle', 'value'),
+     Input('my-mental-health-map', 'tapNodeData'),
+     Input('my-mental-health-map', 'tapEdgeData')],
+    [State('annotation-data', 'data'),  # Use the separate annotation data store
+     State('annotation-input', 'value')]
+)
+def display_annotation_interface(mode, tapNodeData, tapEdgeData, annotation_data, annotation_value):
+    ctx = dash.callback_context
+
+    # If the callback was triggered by selecting a node or an edge in annotation mode
+    if ctx.triggered and mode == 'annotate':
+        # Determine which element was selected, node or edge
+        selected_element = tapNodeData if tapNodeData else tapEdgeData
+        if selected_element:
+            element_id = selected_element['id']
+            # Retrieve the existing annotation for the element
+            existing_annotation = annotation_data.get(element_id, "")
+            # Show the text area and the save button with the existing annotation
+            return {'display': 'block'}, {'display': 'block'}, existing_annotation
+
+    # Hide the interface if not in annotation mode or no element is selected
+    return {'display': 'none'}, {'display': 'none'}, annotation_value  # Keep the existing value if no new element is selected
+
+# Callback: Annotation - Save new annotation to edit graph data & display in graph
+@app.callback(
+    Output('annotation-data', 'data', allow_duplicate=True),
+    Input('save-annotation-btn', 'n_clicks'),
+    [State('my-mental-health-map', 'tapNodeData'),
+     State('my-mental-health-map', 'tapEdgeData'),
+     State('annotation-input', 'value'),
+     State('annotation-data', 'data')],
+     prevent_initial_call=True
+)
+def save_annotation(n_clicks, tapNodeData, tapEdgeData, annotation_value, annotation_data):
+    # If the Save button is clicked
+    if n_clicks:
+        # Determine which element was selected, node or edge
+        selected_element = tapNodeData if tapNodeData else tapEdgeData
+        if selected_element:
+            element_id = selected_element['id']
+            # Update the annotation data store with the new value
+            annotation_data[element_id] = annotation_value
+
+    # Return the updated annotations
+    return annotation_data
 
 # Callback: Download network as image ***
 
-# Node annotation (**)
-# Inspect node functionality (**)
-
-# Schemes including newly added nodes & edges
-# Set static default graph layout 
-# edges gone 
+# Set static default graph layout ***
+# edges gone ***
 
 # Information
 @app.callback(

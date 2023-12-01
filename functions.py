@@ -222,20 +222,43 @@ def create_mental_health_map_tab(edit_map_data, color_scheme_data, sizing_scheme
                                ], id="modal-sizing-scheme", style={"display": "flex", "gap": "5px"}),
                 ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'}),
 
-                html.Br(),
-                
-                # html.Div([
-                #     dcc.RadioItems(
-                #         id='mode-toggle',
-                #         options=[
-                #             {'label': 'View Mode', 'value': 'view'},
-                #             {'label': 'Inspect Mode', 'value': 'inspect'}
-                #         ],
-                #         value='view',
-                #         labelStyle={'display': 'inline-block'}
-                #     )
-                # ])
-                html.Div([toggle])
+                html.Br(), html.Br(),
+                html.Div([toggle]),
+                html.Br(), html.Br(),
+                html.Div(id='annotation-interface', children=[
+                    html.Div(
+                    dcc.Textarea(
+                        id='annotation-input',
+                        value='',
+                        className='custom-textarea',
+                        style={
+                            'display': 'none',
+                            'flex': '1',  # Flex for input to take available space
+                            'fontSize': '0.9em',  # Adjust font size to make textbox smaller
+                            'resize': 'none'
+                        }
+                    ),
+                    style={'flex': '1', 'marginRight': '3px', 
+                           'borderRadius': '10px !important'}  # Margin applied to the wrapper div
+                ),
+                html.Div(
+                    dbc.Button('💾', id='save-annotation-btn', style={'display': 'none'}),
+                    style={'flex': 'none'}  # This div doesn't grow or shrink
+                )
+            ], style={
+                'display': 'flex', 
+                'alignItems': 'center', 
+                'marginBottom': '10px'
+            })
+
+
+            #     html.Div(id='annotation-interface', children=[
+            #         dcc.Textarea(id='annotation-input',
+            #                      value='',
+            #                      style={'display': 'none'}),
+            #         html.Br(),
+            #         dbc.Button('Save', id='save-annotation-btn', 
+            #                    style={'display': 'none'})])
 
             ], style={'width': '300px', 'padding': '10px', 'marginTop': '80px'})
         
