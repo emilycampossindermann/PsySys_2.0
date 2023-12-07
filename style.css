@@ -40,3 +40,19 @@ style.css
     border-radius: 10px !important;
     border: 1px solid #CCCCCC;
 }
+
+/* In your CSS file (e.g., assets/main.css) */
+.node-tooltip {
+    background-color: #fff;
+    border-color: #000;
+    border-width: 1px;
+    border-style: solid;
+    font-size: 12px;
+    padding: 5px;
+    z-index: 9999; /* Ensure tooltip is displayed above other elements */
+    display: none; /* Initially hidden */
+}
+
+.node:hover .node-tooltip {
+    display: block;
+}

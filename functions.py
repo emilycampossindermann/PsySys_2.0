@@ -193,16 +193,60 @@ def create_mental_health_map_tab(edit_map_data, color_scheme_data, sizing_scheme
             ], style={'flex': '1'}),
 
             # Modal for node name & severity edit
-            dbc.Modal([dbc.ModalHeader(dbc.ModalTitle("Edit Node")),
+            dbc.Modal([dbc.ModalHeader(dbc.ModalTitle("Factor Information")),
                        dbc.ModalBody([
-                           html.Div("Node Name:"),
-                           dcc.Input(id='modal-node-name', type='text'),
+                           html.Div("Name:"),
+                           dbc.Input(id='modal-node-name', type='text'),
+                           html.Br(),
                            html.Div("Severity Score:"),
-                           dcc.Slider(id='modal-severity-score', min=0, max=10, step=1)]),
+                           dcc.Slider(id='modal-severity-score', min=0, max=10, step=1),
+                           html.Br(),
+                           html.Div("Notes:"),
+                           dcc.Textarea(
+                               id='note-input',
+                               value='',
+                               className='custom-textarea',
+                               style={
+                                   'flex': '1',  # Flex for input to take available space 
+                                   'fontSize': '0.9em',  # Adjust font size to make textbox smaller
+                                   'resize': 'none',
+                                   'width': '32em',
+                                   'height': '10em'
+                                }
+                            )
+                           ]),
                         dbc.ModalFooter(
-                            dbc.Button("Save Changes", id="modal-save-btn", className="ms-auto", n_clicks=0))
+                            dbc.Button("Save Changes", id="modal-save-btn", className="ms-auto", n_clicks=0))    
                             ],
                             id='node-edit-modal',
+                            is_open=False),
+
+            # Modal for edge info
+            dbc.Modal([dbc.ModalHeader(dbc.ModalTitle("Connection Information")),
+                       dbc.ModalBody([
+                           html.Div(id='edge-explanation'),
+                           html.Br(),
+                           html.Div("Strength of the relationship:"),
+                           dcc.Slider(id='edge-strength', min=1, max=5, step=1),
+                           html.Br(),
+                           html.Div("Notes:"),
+                           dcc.Textarea(
+                               id='edge-annotation',
+                               value='',
+                               className='custom-textarea',
+                               style={
+                                   'flex': '1',  # Flex for input to take available space 
+                                   'fontSize': '0.9em',  # Adjust font size to make textbox smaller
+                                   'resize': 'none',
+                                   'width': '32em',
+                                   'height': '10em'
+                                }
+                            )
+                           ]),
+                        dbc.ModalFooter(
+                            dbc.Button("Save Changes", id="edge-save-btn", className="ms-auto", n_clicks=0))    
+                            ],
+                            id='edge-edit-modal',
                             is_open=False),
 
             # Editing features
@@ -406,34 +450,6 @@ def apply_severity_color_styles(type, stylesheet, severity_scores, default_style
 
     return stylesheet
 
-# def apply_severity_color_styles(type, stylesheet, severity_scores, default_style):
-#     if severity_scores and all(isinstance(score, (int, float)) for score in severity_scores.values()):
-#         if type == "Severity":
-#             max_severity = max(severity_scores.values())
-#             min_severity = min(severity_scores.values())
-#         elif type == "Severity (abs)":
-#             max_severity = 10
-#             min_severity = 1
-
-#         # Normalize and apply color based on severity
-#         for element in stylesheet:  # Assuming each element has a label
-#             node_label = element.get('data', {}).get('label', '')
-#             severity = severity_scores.get(node_label, 0)  # Use node label to find severity score
-#             normalized_severity = (severity - min_severity) / (max_severity - min_severity)
-#             r, g, b = get_color(normalized_severity)
-
-#             severity_style = {
-#                 'selector': f'node[label="{node_label}"]',  # Use label selector
-#                 'style': {'background-color': f'rgb({r},{g},{b})'}
-#             }
-#             # Append the style for this node
-#             stylesheet.append(severity_style)
-
-#     elif severity_scores == {}:
-#         stylesheet = default_style
-
-#     return stylesheet
-
 # Function: Apply degree centrality color
 def apply_centrality_color_styles(type, stylesheet, elements):
     degrees = {element['data']['id']: {'out': 0, 'in': 0} for element in elements 
@@ -527,6 +543,7 @@ def apply_severity_size_styles(type, stylesheet, severity_scores, default_style)
     max_size = 50
     min_size = 10
 
+    #print(severity_scores.items())
     if severity_scores and all(isinstance(score, (int, float)) for score in severity_scores.values()):
         if type == "Severity":
             max_severity = max(severity_scores.values())
@@ -552,36 +569,6 @@ def apply_severity_size_styles(type, stylesheet, severity_scores, default_style)
         #return dash.no_update
 
     return stylesheet
-
-# def apply_severity_size_styles(type, stylesheet, severity_scores, default_style):
-#     max_size = 50
-#     min_size = 10
-
-#     if severity_scores and all(isinstance(score, (int, float)) for score in severity_scores.values()):
-#         if type == "Severity":
-#             max_severity = max(severity_scores.values())
-#             min_severity = min(severity_scores.values())
-#         elif type == "Severity (abs)":
-#             max_severity = 10
-#             min_severity = 1
-
-#         # Normalize and apply color based on severity
-#         for element in stylesheet:  # Assuming each element has a label
-#             node_label = element.get('data', {}).get('label', '')
-#             severity = severity_scores.get(node_label, 0)  # Use node label to find severity score
-#             size = normalize_size(severity, max_severity, min_severity, min_size, max_size)
-
-#             severity_style = {
-#                 'selector': f'node[label="{node_label}"]',  # Use label selector
-#                 'style': {'width': size, 'height': size}
-#             }
-#             # Append the style for this node
-#             stylesheet.append(severity_style)
-
-#     elif severity_scores == {}:
-#         stylesheet = default_style
-
-#     return stylesheet
 
 # Function: Apply degree centraliy node sizing
 def apply_centrality_size_styles(type, stylesheet, elements):
@@ -673,3 +660,46 @@ def graph_color(session_data, severity_scores):
     session_data = node_sizing(chosen_scheme="Severity", graph_data=session_data, severity_scores=severity_scores)
 
     return session_data
+
+# Function: Initialize annotation tooltips
+# def initialize_annotations(mode, edit_map_data, annotation_data):
+#     if mode == 'annotate':
+#         elements = edit_map_data.get('elements', [])
+#         for element in elements:
+#             if 'id' in element['data']:
+#                 node_id = element['data']['id']
+#                 annotation = annotation_data.get(node_id, "No annotation")
+#                 element['data']['tooltip'] = annotation  # Add tooltip content
+#         return elements
+#     return dash.no_update
+
+# Function: Update stylesheet with tooltips
+# def update_stylesheet_based_on_mode(mode, edit_map_data):
+#     default_stylesheet = edit_map_data.get('stylesheet', [])
+#     if mode == 'annotate':
+#         tooltip_stylesheet = [
+#             {
+#                 'selector': 'node',
+#                 'style': {
+#                     'content': 'data(label)'  # Display the node label
+#                 }
+#             },
+#             {
+#                 'selector': 'node:hover',
+#                 'style': {
+#                     'content': 'data(tooltip)',  # Display the tooltip content on hover
+#                     'text-valign': 'center',
+#                     'text-halign': 'center',
+#                     'background-color': '#fff',
+#                     'border-color': '#000',
+#                     'border-width': '1px',
+#                     'border-style': 'solid',
+#                     'font-size': '12px',
+#                     'padding': '5px',
+#                     'z-index': '9999'
+#                 }
+#             }
+#         ]
+#         return default_stylesheet + tooltip_stylesheet
+#     else:
+#         return default_stylesheet
