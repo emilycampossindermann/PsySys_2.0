@@ -844,60 +844,132 @@ def upload_graph(contents, filename):
         return data
     return dash.no_update
 
+# Callback: Open edit node modal upon clicking it
+# @app.callback(
+#     [Output('node-edit-modal', 'is_open'),
+#      Output('modal-node-name', 'value'),
+#      Output('modal-severity-score', 'value')],
+#     [Input('my-mental-health-map', 'tapNodeData'),
+#      Input('mode-toggle', 'value'),
+#      Input('severity-scores', 'data')],
+#     prevent_initial_call=True
+# )
+# def open_node_edit_modal(tapNodeData, mode, severity_scores):
+#     if mode == 'view' and tapNodeData:
+#         node_id = tapNodeData['id']
+#         node_name = tapNodeData.get('label', node_id)  # Assuming label is stored in tapNodeData
+#         severity_score = severity_scores.get(node_id, 0)  # Assuming severity_scores is accessible
+#         print(severity_score)
+#         return True, node_name, severity_score
+#     return False, None, None
+
+@app.callback(
+    [Output('node-edit-modal', 'is_open'),
+     Output('modal-node-name', 'value'),
+     Output('modal-severity-score', 'value')],
+    [Input('my-mental-health-map', 'tapNodeData'),
+     Input('mode-toggle', 'value'),
+     Input('severity-scores', 'data')],
+    prevent_initial_call=True
+)
+def open_node_edit_modal(tapNodeData, mode, severity_scores):
+    if mode == 'view' and tapNodeData:
+        node_id = tapNodeData['id']
+        node_name = tapNodeData.get('label', node_id)  # Use label as the key for severity_scores
+        severity_score = severity_scores.get(node_name, 0)  # Retrieve severity score using the node name
+        return True, node_name, severity_score
+    return False, None, None
+
+# Callback: Save node edits (name & severity) in graph and edit_map_data
+@app.callback(
+    [Output('my-mental-health-map', 'elements', allow_duplicate=True),
+     Output('severity-scores', 'data', allow_duplicate=True),
+     Output('edit-map-data', 'data', allow_duplicate=True)],
+    [Input('modal-save-btn', 'n_clicks')],
+    [State('modal-node-name', 'value'),
+     State('modal-severity-score', 'value'),
+     State('my-mental-health-map', 'elements'),
+     State('severity-scores', 'data'),
+     State('edit-map-data', 'data'),
+     State('my-mental-health-map', 'tapNodeData')],
+    prevent_initial_call=True
+)
+def save_node_changes(n_clicks, new_name, new_severity, elements, severity_scores, edit_map_data, tapNodeData):
+    if n_clicks and tapNodeData:
+        old_node_id = tapNodeData['id']
+        old_node_name = tapNodeData.get('label', old_node_id)  # Assuming label is stored in tapNodeData
+
+        # Update node name in elements
+        for element in elements:
+            if element.get('data', {}).get('id') == old_node_id:
+                element['data']['label'] = new_name
+
+        # Update node name in severity_scores if it's changed
+        if old_node_name != new_name:
+            severity_scores[new_name] = severity_scores.pop(old_node_name, new_severity)
+
+        # Update severity score
+        severity_scores[new_name] = new_severity
+        print(severity_scores)
+        # Update edit_map_data with the changed elements
+        edit_map_data['elements'] = elements
+
+        return elements, severity_scores, edit_map_data
+    return dash.no_update
+
+
+# Callback: Close edit node modal upon clicking "Save changes"
+
 # Callback: Edit map - add node
 @app.callback(
     [Output('my-mental-health-map', 'elements'),
      Output('edit-edge', 'options'),
-     Output('edit-map-data', 'data', allow_duplicate=True)],
+     Output('edit-map-data', 'data', allow_duplicate=True),
+     Output('severity-scores', 'data', allow_duplicate=True)],  # Add this output
     [Input('btn-plus-node', 'n_clicks')],
     [State('edit-node', 'value'),
      State('my-mental-health-map', 'elements'),
-     State('edit-map-data', 'data')],
-     prevent_initial_call = True
+     State('edit-map-data', 'data'),
+     State('severity-scores', 'data')],  # Add this state
+     prevent_initial_call=True
 )
-def map_add_node(n_clicks, node_name, elements, edit_map_data): 
-    # Else append new node name to add-node list
+def map_add_node(n_clicks, node_name, elements, edit_map_data, severity_scores):
     if n_clicks and node_name:
-        # Ensure the node doesn't already exist
         if not any(node['data']['id'] == node_name for node in elements):
-            new_node = {
-                'data': {'id': node_name, 'label': node_name},
-                'style': {'background-color': 'grey'}
-            }
+            new_node = {'data': {'id': node_name, 'label': node_name}}
             elements.append(new_node)
+            severity_scores[node_name] = 5  # Add new node with default severity score
 
-    # Extract all node names
     node_names = [node['data']['id'] for node in elements if 'id' in node['data'] and len(node['data']['id']) < 30]
     edit_map_data['add-nodes'] = node_names
     edit_map_data['elements'] = elements
 
-    return elements, node_names, edit_map_data
+    return elements, node_names, edit_map_data, severity_scores
 
 # Callback: Remove existing node from graph
 @app.callback(
     [Output('my-mental-health-map', 'elements', allow_duplicate=True),
      Output('edit-edge', 'options', allow_duplicate=True),
-     Output('edit-map-data', 'data', allow_duplicate=True)],
+     Output('edit-map-data', 'data', allow_duplicate=True),
+     Output('severity-scores', 'data', allow_duplicate=True)],  # Add this output
     [Input('btn-minus-node', 'n_clicks')],
     [State('edit-node', 'value'),
      State('my-mental-health-map', 'elements'),
-     State('edit-map-data', 'data')],
+     State('edit-map-data', 'data'),
+     State('severity-scores', 'data')],  # Add this state
      prevent_initial_call=True
 )
-def delete_node(n_clicks, node_id, elements, edit_map_data):
+def delete_node(n_clicks, node_id, elements, edit_map_data, severity_scores):
     if n_clicks and node_id:
-        # Remove the node
         elements = [element for element in elements if element['data'].get('id') != node_id]
+        if node_id in severity_scores:
+            del severity_scores[node_id]  # Remove node from severity scores
 
-        # Remove edges connected to the node
-        elements = [element for element in elements if not (('source' in element['data'] and element['data']['source'] == node_id) or ('target' in element['data'] and element['data']['target'] == node_id))]
-
-    # Extract all node names
     node_names = [node['data']['id'] for node in elements if 'id' in node['data'] and len(node['data']['id']) < 30]
     edit_map_data['add-nodes'] = node_names
     edit_map_data['elements'] = elements
 
-    return elements, node_names, edit_map_data
+    return elements, node_names, edit_map_data, severity_scores
 
 # Callback: Limit dropdown for edit-edge to 2
 @app.callback(
@@ -1081,7 +1153,6 @@ def update_stylesheet(tapNodeData, mode, edit_map_data):
         return new_stylesheet
     # Return default if no node is clicked or if mode is not 'inspect'
     return default_stylesheet
-
 
 # Callback: Annotation - initialize graph element annotations when in mode
 @app.callback(
