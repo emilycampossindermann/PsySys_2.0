@@ -266,7 +266,7 @@ def create_mental_health_map_tab(edit_map_data, color_scheme_data, sizing_scheme
                 html.Div([
                     dcc.Dropdown(id='color-scheme', options=color_schemes, value=color_scheme_data, placeholder='Select a color scheme', multi=False, style={'width': '96%', 'borderRadius': '10px'}),
                     dbc.Button("❔", id='help-color', color="light", style={'marginRight': '0px'}),
-                    dbc.Modal([dbc.ModalHeader("Color Scheme Information"),
+                    dbc.Modal([dbc.ModalHeader(dbc.ModalTitle("Color Scheme Information")),
                                dbc.ModalBody("Content explaining the color scheme will go here...", id='modal-color-scheme-body')
                                ], id="modal-color-scheme"),
                 ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'}),
@@ -274,48 +274,52 @@ def create_mental_health_map_tab(edit_map_data, color_scheme_data, sizing_scheme
                 html.Div([
                     dcc.Dropdown(id='sizing-scheme', options=sizing_schemes, value=sizing_scheme_data, placeholder='Select a sizing scheme', multi=False, style={'width': '96%', 'borderRadius': '10px'}),
                     dbc.Button("❔", id='help-size', color="light", style={'marginRight': '0px'}),
-                    dbc.Modal([dbc.ModalHeader("Node Size Information"),
+                    dbc.Modal([dbc.ModalHeader(dbc.ModalTitle("Sizing Scheme Information")),
                                dbc.ModalBody("Content explaining the color scheme will go here...", id='modal-sizing-scheme-body')
                                ], id="modal-sizing-scheme", style={"display": "flex", "gap": "5px"}),
                 ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'}),
+                html.Br(),
 
-                html.Br(), html.Br(),
-                html.Div([toggle]),
-                html.Br(), html.Br(),
-                html.Div(id='annotation-interface', children=[
-                    html.Div(
-                    dcc.Textarea(
-                        id='annotation-input',
-                        value='',
-                        className='custom-textarea',
-                        style={
-                            'display': 'none',
-                            'flex': '1',  # Flex for input to take available space
-                            'fontSize': '0.9em',  # Adjust font size to make textbox smaller
-                            'resize': 'none'
-                        }
-                    ),
-                    style={'flex': '1', 'marginRight': '3px', 
-                           'borderRadius': '10px !important'}  # Margin applied to the wrapper div
-                ),
-                html.Div(
-                    dbc.Button('💾', id='save-annotation-btn', style={'display': 'none'}),
-                    style={'flex': 'none'}  # This div doesn't grow or shrink
-                )
-            ], style={
-                'display': 'flex', 
-                'alignItems': 'center', 
-                'marginBottom': '10px'
-            })
+                html.Div([
+                    #dbc.Label("Toggle a bunch"),
+                    dbc.Checklist(options=[{"label": "Inspect", "value": 0}],
+                                 value=[1],
+                                 id="inspect-switch",
+                                 switch=True),
+                    dbc.Button("❔", id='help-inspect', color="light", style={'marginLeft': '10px'}),
+                    dbc.Modal([dbc.ModalHeader(dbc.ModalTitle("Inspection Mode")),
+                               dbc.ModalBody("Within this mode you can further inspect the consequences of a given factor. Just click on a factor to see its direct effects.", id='modal-inspect-body')
+                               ], id="modal-inspect"),
+                               ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'}), 
 
-
+            #     html.Br(), html.Br(),
+            #     html.Div([toggle]),
+            #     html.Br(), html.Br(),
             #     html.Div(id='annotation-interface', children=[
-            #         dcc.Textarea(id='annotation-input',
-            #                      value='',
-            #                      style={'display': 'none'}),
-            #         html.Br(),
-            #         dbc.Button('Save', id='save-annotation-btn', 
-            #                    style={'display': 'none'})])
+            #         html.Div(
+            #         dcc.Textarea(
+            #             id='annotation-input',
+            #             value='',
+            #             className='custom-textarea',
+            #             style={
+            #                 'display': 'none',
+            #                 'flex': '1',  # Flex for input to take available space
+            #                 'fontSize': '0.9em',  # Adjust font size to make textbox smaller
+            #                 'resize': 'none'
+            #             }
+            #         ),
+            #         style={'flex': '1', 'marginRight': '3px', 
+            #                'borderRadius': '10px !important'}  # Margin applied to the wrapper div
+            #     ),
+            #     html.Div(
+            #         dbc.Button('💾', id='save-annotation-btn', style={'display': 'none'}),
+            #         style={'flex': 'none'}  # This div doesn't grow or shrink
+            #     )
+            # ], style={
+            #     'display': 'flex', 
+            #     'alignItems': 'center', 
+            #     'marginBottom': '10px'
+            # })
 
             ], style={'width': '300px', 'padding': '10px', 'marginTop': '80px'})
         

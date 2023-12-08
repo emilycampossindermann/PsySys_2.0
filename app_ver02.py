@@ -389,13 +389,13 @@ def upload_graph(contents, filename):
      Output('modal-severity-score', 'value'),
      Output('note-input', 'value')],
     [Input('my-mental-health-map', 'tapNodeData'),
-     Input('mode-toggle', 'value'),
+     Input('inspect-switch', 'value'),
      Input('severity-scores', 'data'),
      State('annotation-data', 'data')],  # Add State for annotation-data
     prevent_initial_call=True
 )
-def open_node_edit_modal(tapNodeData, mode, severity_scores, annotations):
-    if mode == 'view' and tapNodeData:
+def open_node_edit_modal(tapNodeData, switch, severity_scores, annotations):
+    if 0 not in switch and tapNodeData:
         node_id = tapNodeData['id']
         node_name = tapNodeData.get('label', node_id)
         severity_score = severity_scores.get(node_name, 0)
@@ -452,42 +452,57 @@ def save_node_changes(n_clicks, new_name, new_severity, elements, severity_score
         return elements, severity_scores, edit_map_data
     return dash.no_update
 
+# Callback to open the modal
 @app.callback(
     [Output('edge-edit-modal', 'is_open'),
      Output('edge-explanation', 'children'),
      Output('edge-strength', 'value'),
      Output('edge-annotation', 'value')],
     [Input('my-mental-health-map', 'tapEdgeData'),
-     State('edge-data', 'data')],
+     Input('inspect-switch', 'value')],
+    State('edge-data', 'data'),
     prevent_initial_call=True
 )
-def open_edge_edit_modal(tapEdgeData, edge_data):
-    if edge_data is None:
-        edge_data = {}  # Initialize edge_data if it's None
-
-    if tapEdgeData:
-        edge_id = tapEdgeData['id']
-        explanation = f"The factor {tapEdgeData['source']} causes the factor {tapEdgeData['target']}"
-        strength = edge_data.get(edge_id, {}).get('strength', 3)  # Default strength
-        annotation = edge_data.get(edge_id, {}).get('annotation', '')
-        return True, explanation, strength, annotation
-
-    return False, '', 3, ''
-
-# UPON SAVE BUTTON?
-@app.callback(
-    Output('edge-data', 'data'),
-    [Input('edge-strength', 'value'),
-     Input('edge-annotation', 'value')],
-    [State('my-mental-health-map', 'tapEdgeData'),
-     State('edge-data', 'data')]
-)
-def update_edge_data(strength, annotation, tapEdgeData, edge_data):
-    # Initialize edge_data if it's None
+def open_edge_edit_modal(tapEdgeData, switch, edge_data):
     if edge_data is None:
         edge_data = {}
 
-    if tapEdgeData:
+    if 0 not in switch and tapEdgeData:
+        edge_id = tapEdgeData['id']
+        explanation = f"The factor {tapEdgeData['source']} causes the factor {tapEdgeData['target']}"
+        strength = edge_data.get(edge_id, {}).get('strength', 5)
+        annotation = edge_data.get(edge_id, {}).get('annotation', '')
+        return True, explanation, strength, annotation
+
+    return False, '', 5, ''
+
+# Combined callback to update the edge data and close the modal
+@app.callback(
+    [Output('edge-data', 'data', allow_duplicate=True),
+     Output('edge-edit-modal', 'is_open', allow_duplicate=True),
+     Output('my-mental-health-map', 'stylesheet', allow_duplicate=True)],
+    [Input('edge-save-btn', 'n_clicks'),
+     Input('my-mental-health-map', 'tapEdgeData'),
+     Input('inspect-switch', 'value')],
+    [State('edge-strength', 'value'),
+     State('edge-annotation', 'value'),
+     State('edge-data', 'data'),
+     State('edge-edit-modal', 'is_open'),
+     State('edit-map-data', 'data'),
+     State('my-mental-health-map', 'stylesheet')],
+     prevent_initial_call=True
+)
+def update_edge_data_and_close_modal(save_clicks, tapEdgeData, switch, strength, annotation, edge_data, is_open, edit_map_data, current):
+    ctx = callback_context
+    triggered_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    # Ensure edge_data and edit_map_data['stylesheet'] are initialized
+    if edge_data is None:
+        edge_data = {}
+    #stylesheet = edit_map_data.get('stylesheet', []) if edit_map_data else []
+    stylesheet=current
+
+    if triggered_id == 'edge-save-btn' and tapEdgeData:
         edge_id = tapEdgeData['id']
         # Update the edge data
         edge_data[edge_id] = {
@@ -495,40 +510,163 @@ def update_edge_data(strength, annotation, tapEdgeData, edge_data):
             'annotation': annotation
         }
 
-    return edge_data
+        # Update the stylesheet for the tapped edge
+        opacity = strength / 5  # Adjust opacity based on strength
+        tapped_edge_style = {
+            'selector': f'edge[id="{edge_id}"]',
+            'style': {'opacity': opacity}
+        }
+        # Create a new stylesheet with updated style for the tapped edge
+        new_stylesheet = [rule for rule in stylesheet if rule['selector'] != f'edge[id="{edge_id}"]']
+        new_stylesheet.append(tapped_edge_style)
+
+        return edge_data, False, new_stylesheet  # Close the modal and update stylesheet
+
+    if triggered_id == 'my-mental-health-map' and 0 not in switch and tapEdgeData:
+        edge_id = tapEdgeData['id']
+        strength = edge_data.get(edge_id, {}).get('strength', 5)
+        annotation = edge_data.get(edge_id, {}).get('annotation', '')
+        return edge_data, True, stylesheet  # Open the modal without updating stylesheet
+
+    return edge_data, is_open, stylesheet  # Default return
+
+# def update_edge_data_and_close_modal(save_clicks, tapEdgeData, switch, strength, annotation, edge_data, is_open, edit_map_data):
+#     ctx = callback_context
+#     triggered_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+#     if edge_data is None:
+#         edge_data = {}
+
+#     if triggered_id == 'edge-save-btn' and tapEdgeData:
+#         edge_id = tapEdgeData['id']
+#         # Update the edge data
+#         edge_data[edge_id] = {
+#             'strength': strength,
+#             'annotation': annotation
+#         }
+#         print(edge_data)
+#         return edge_data, False  # Close the modal
+
+#     # Handle opening the modal
+#     if triggered_id == 'my-mental-health-map' and 0 not in switch and tapEdgeData:
+#         edge_id = tapEdgeData['id']
+#         explanation = f"The factor {tapEdgeData['source']} causes the factor {tapEdgeData['target']}"
+#         strength = edge_data.get(edge_id, {}).get('strength', 3)
+#         annotation = edge_data.get(edge_id, {}).get('annotation', '')
+#         return edge_data, True  # Open the modal
+    
+#     # # extra
+#     # if edge_data:
+#     #     edge_id = tapEdgeData['id']
+#     #     edge_info = edge_data.get(edge_id, {})
+#     #     strength = edge_info.get('strength', 1)
+
+#     #     # Default stylesheet
+#     #     stylesheet = edit_map_data['stylesheet']
+#     #     # Add style for the tapped edge
+#     #     # tapped_edge_style = {
+#     #     #     'selector': f'edge[id="{edge_id}"]',
+#     #     #     'style': {
+#     #     #         'line-color': '#FF4136',  # Example color, change as needed
+#     #     #         'width': 2 + strength * 2,  # Example width formula based on strength
+#     #     #         # You can add more styles here based on strength
+#     #     #     }
+#     #     # }
+#     #     # stylesheet.append(tapped_edge_style)
+
+#     #     opacity = strength / 5
+
+#     #     # Add style for the tapped edge
+#     #     tapped_edge_style = {
+#     #         'selector': f'edge[id="{edge_id}"]',
+#     #         'style': {
+#     #             'line-opacity': opacity,
+#     #             'width': 2 + strength * 2,
+#     #         }
+#     #     }
+#     #     stylesheet.append(tapped_edge_style)
+
+#     return edge_data, is_open, stylesheet  # Default return to maintain the current state
+
 
 # NOT WORKING **
-@app.callback(
-    Output('my-mental-health-map', 'stylesheet', allow_duplicate=True),
-    [Input('edge-data', 'data')],
-    State('edit-map-data', 'data'),
-    prevent_initial_call = True
-)
-def update_edge_style(edge_data, edit_map_data):
-    stylesheet = edit_map_data.get('stylesheet', []) if edit_map_data else []
+# @app.callback(
+#     Output('my-mental-health-map', 'stylesheet', allow_duplicate=True),
+#     [Input('edge-data', 'data')],
+#     State('edit-map-data', 'data'),
+#     prevent_initial_call = True
+# )
+# def update_edge_style(edge_data, edit_map_data):
+#     stylesheet = edit_map_data.get('stylesheet', []) if edit_map_data else []
 
-    if edge_data:
-        # Create a new list for the updated stylesheet to avoid duplicates
-        updated_stylesheet = []
+#     if edge_data:
+#         # Create a new list for the updated stylesheet to avoid duplicates
+#         updated_stylesheet = []
 
-        for rule in stylesheet:
-            # Copy only the rules that don't involve edges
-            if not rule['selector'].startswith('#'):
-                updated_stylesheet.append(rule)
+#         for rule in stylesheet:
+#             # Copy only the rules that don't involve edges
+#             if not rule['selector'].startswith('#'):
+#                 updated_stylesheet.append(rule)
 
-        for edge_id, data in edge_data.items():
-            opacity = data['strength'] / 5  # Adjust this formula as needed
-            updated_stylesheet.append({
-                'selector': f'#{edge_id}',
-                'style': {
-                    'line-opacity': opacity,
-                    'color': 'yellow'
-                }
-            })
+#         for edge_id, data in edge_data.items():
+#             strength = max(data.get('strength', 1), 1)
+#             opacity = strength / 5
+#             updated_stylesheet.append({
+#                 'selector': f'edge[id = "{edge_id}"]',
+#                 'style': {
+#                     'line-opacity': opacity,
+#                     'color': 'yellow'
+#                 }
+#             })
 
-        return updated_stylesheet
+#         return updated_stylesheet
 
-    return stylesheet
+#     return stylesheet
+
+# @app.callback(
+#     Output('my-mental-health-map', 'stylesheet', allow_duplicate=True),
+#      #Output('edit-map-data', 'data', allow_duplicate=True)],
+#     [Input('my-mental-health-map', 'tapEdgeData')],
+#     [State('edge-data', 'data'), 
+#      State('edit-map-data', 'data')], 
+#      prevent_initial_call=True
+# )
+# def display_edge_strength(tapEdgeData, edge_data, edit_map_data):
+#     if not tapEdgeData or not edge_data:
+#         return dash.no_update
+
+#     edge_id = tapEdgeData['id']
+#     edge_info = edge_data.get(edge_id, {})
+#     strength = edge_info.get('strength', 1)
+
+#     # Default stylesheet
+#     stylesheet = edit_map_data['stylesheet']
+#     # Add style for the tapped edge
+#     # tapped_edge_style = {
+#     #     'selector': f'edge[id="{edge_id}"]',
+#     #     'style': {
+#     #         'line-color': '#FF4136',  # Example color, change as needed
+#     #         'width': 2 + strength * 2,  # Example width formula based on strength
+#     #         # You can add more styles here based on strength
+#     #     }
+#     # }
+#     # stylesheet.append(tapped_edge_style)
+
+#     opacity = strength / 5
+
+#     # Add style for the tapped edge
+#     tapped_edge_style = {
+#         'selector': f'edge[id="{edge_id}"]',
+#         'style': {
+#             'line-opacity': opacity,
+#             'width': 2 + strength * 2,
+#         }
+#     }
+#     stylesheet.append(tapped_edge_style)
+
+#     edit_map_data['stylesheet'] = stylesheet
+
+#     return stylesheet
 
 # Callback: Edit map - add node
 @app.callback(
@@ -725,19 +863,19 @@ def update_sizing_scheme_dropdown(value):
 @app.callback(
     Output('my-mental-health-map', 'stylesheet'),
     [Input('my-mental-health-map', 'tapNodeData'),
-     Input('mode-toggle', 'value'),],
+     Input('inspect-switch', 'value')],
     State('edit-map-data', 'data')
 )
-def update_stylesheet(tapNodeData, mode, edit_map_data):
+def update_stylesheet(tapNodeData, switch, edit_map_data):
     default_stylesheet = edit_map_data['stylesheet']
     elements = edit_map_data['elements']
 
     # Reset to default if in view mode
-    if mode == 'view':
+    if 0 not in switch:
         return default_stylesheet
 
     # If in inspect mode and a node is clicked
-    if mode == 'inspect' and tapNodeData:
+    if 0 in switch and tapNodeData:
         clicked_node_id = tapNodeData['id']
         # Find outgoing edges from the clicked node
         outgoing_edges = [e for e in elements if e.get('data', {}).get('source') == clicked_node_id]
@@ -763,6 +901,80 @@ def update_stylesheet(tapNodeData, mode, edit_map_data):
         return new_stylesheet
     # Return default if no node is clicked or if mode is not 'inspect'
     return default_stylesheet
+
+# Information
+@app.callback(
+    Output('modal-inspect', 'is_open'),
+    [Input('help-inspect', 'n_clicks')],
+    [State('modal-inspect', 'is_open')],
+)
+def inspect_info(n_clicks, is_open):
+    if n_clicks:
+        return not is_open
+    return is_open
+
+@app.callback(
+    Output('modal-color-scheme', 'is_open'),
+    [Input('help-color', 'n_clicks')],
+    [State('modal-color-scheme', 'is_open')],
+)
+def toggle_modal_color(n_clicks, is_open):
+    if n_clicks:
+        return not is_open
+    return is_open
+
+@app.callback(
+    Output('modal-color-scheme-body', 'children'),
+    [Input('color-scheme', 'value')]
+)
+def update_modal_content_color(selected_scheme):
+    if selected_scheme == 'Uniform':
+        return 'All the factors in your map have the same color.'
+    if selected_scheme == 'Severity':
+        return 'The factors in your map are colored based on their relative severity. The darkest factor has the highest indicated severity and the lightest factor has lowest indicated severity.'
+    elif selected_scheme == 'Severity (abs)':
+        return 'The factors in your map are colored based on their absolute severity. The darkest factor has the highest possible severity score (10) and the lightest factor has the lowest possible severity score (0).'
+    elif selected_scheme == 'Out-degree':
+        return 'The factors in your map are colored based on their out-degree, which refers to the number of out-going connections. The darkest factor has the most out-going connections and the lightest factor has the least out-going connections. Factors with a lot of out-going connections can be seen as main causes in your map.'
+    elif selected_scheme == 'In-degree':
+        return 'The factors in your map are colored based on their in-degree, which refers to the number of incoming connections. The darkest factor has the most incoming connections and the lightest factor has the least incoming connections. Factors with a lot of incoming connections can be seen as main effects in your map.'
+    elif selected_scheme == 'Out-/In-degree ratio':
+        return 'The factors in your map are colored based on their out-/in-degree ratio, which is calculated by dividing the number of out-going by the number of incoming connections. The darkest factor has many out-going and few incoming connections (active), and the lightest factor has few out-going and many incoming connections (passive).'
+    return 'As a default the factors in your map are uniformly colored.'
+
+@app.callback(
+    Output('modal-sizing-scheme', 'is_open'),
+    [Input('help-size', 'n_clicks')],
+    [State('modal-sizing-scheme', 'is_open')],
+)
+def toggle_modal_sizing(n_clicks, is_open):
+    if n_clicks:
+        return not is_open
+    return is_open
+
+@app.callback(
+    Output('modal-sizing-scheme-body', 'children'),
+    [Input('sizing-scheme', 'value')]
+)
+def update_modal_content_sizing(selected_scheme):
+    if selected_scheme == 'Uniform':
+        return 'All factors in your map have the same size.'
+    if selected_scheme == 'Severity':
+        return 'The size of the factors in your map corresponds to their relative severity. The largest factor has the highest indicated severity and the smallest factor has lowest indicated severity.'
+    elif selected_scheme == 'Severity (abs)':
+        return 'The size of the factors in your map corresponds to their absolute severity. The largest factor has the highest possible severity score (10) and the smallest factor has the lowest possible severity score (0).'
+    elif selected_scheme == 'Out-degree':
+        return 'The size of the factors in your map corresponds to their out-degree, which refers to the number of out-going connections. The largest factor has the most out-going connections and the smallest factor has the least out-going connections. Factors with a lot of out-going connections can be seen as main causes in your map.'
+    elif selected_scheme == 'In-degree':
+        return 'The size of the factors in your map corresponds to their in-degree, which refers to the number of incoming connections. The largest factor has the most incoming connections and the smallest factor has the least incoming connections. Factors with a lot of incoming connections can be seen as main effects in your map.'
+    elif selected_scheme == 'Out-/In-degree ratio':
+        return 'The size of the factors in your map corresponds to their out-/in-degree ratio, which is calculated by dividing the number of out-going by the number of incoming connections. The largest factor has many out-going and few incoming connections (active), and the smallest factor has few out-going and many incoming connections (passive).'
+    return 'As a default the size of the factors in your map corresponds to their relative severity. The largest factor has the highest indicated severity and the smallest factor has lowest indicated severity.'
+
+# INLCUDE MAP IN HOME TAB (**)
+# PROGRESS BAR
+# Callback: Download network as image ***
+# edges gone ***
 
 # Callback: Annotation - initialize graph element annotations when in mode
 # @app.callback(
@@ -932,70 +1144,6 @@ def update_stylesheet(tapNodeData, mode, edit_map_data):
 #     # Otherwise, return the default stylesheet
 #     else:
 #         return default_stylesheet
-
-# Information
-@app.callback(
-    Output('modal-color-scheme', 'is_open'),
-    [Input('help-color', 'n_clicks')],
-    [State('modal-color-scheme', 'is_open')],
-)
-def toggle_modal_color(n_clicks, is_open):
-    if n_clicks:
-        return not is_open
-    return is_open
-
-@app.callback(
-    Output('modal-color-scheme-body', 'children'),
-    [Input('color-scheme', 'value')]
-)
-def update_modal_content_color(selected_scheme):
-    if selected_scheme == 'Uniform':
-        return 'All the factors in your map have the same color.'
-    if selected_scheme == 'Severity':
-        return 'The factors in your map are colored based on their relative severity. The darkest factor has the highest indicated severity and the lightest factor has lowest indicated severity.'
-    elif selected_scheme == 'Severity (abs)':
-        return 'The factors in your map are colored based on their absolute severity. The darkest factor has the highest possible severity score (10) and the lightest factor has the lowest possible severity score (0).'
-    elif selected_scheme == 'Out-degree':
-        return 'The factors in your map are colored based on their out-degree, which refers to the number of out-going connections. The darkest factor has the most out-going connections and the lightest factor has the least out-going connections. Factors with a lot of out-going connections can be seen as main causes in your map.'
-    elif selected_scheme == 'In-degree':
-        return 'The factors in your map are colored based on their in-degree, which refers to the number of incoming connections. The darkest factor has the most incoming connections and the lightest factor has the least incoming connections. Factors with a lot of incoming connections can be seen as main effects in your map.'
-    elif selected_scheme == 'Out-/In-degree ratio':
-        return 'The factors in your map are colored based on their out-/in-degree ratio, which is calculated by dividing the number of out-going by the number of incoming connections. The darkest factor has many out-going and few incoming connections (active), and the lightest factor has few out-going and many incoming connections (passive).'
-    return 'As a default the factors in your map are uniformly colored.'
-
-@app.callback(
-    Output('modal-sizing-scheme', 'is_open'),
-    [Input('help-size', 'n_clicks')],
-    [State('modal-sizing-scheme', 'is_open')],
-)
-def toggle_modal_sizing(n_clicks, is_open):
-    if n_clicks:
-        return not is_open
-    return is_open
-
-@app.callback(
-    Output('modal-sizing-scheme-body', 'children'),
-    [Input('sizing-scheme', 'value')]
-)
-def update_modal_content_sizing(selected_scheme):
-    if selected_scheme == 'Uniform':
-        return 'All factors in your map have the same size.'
-    if selected_scheme == 'Severity':
-        return 'The size of the factors in your map corresponds to their relative severity. The largest factor has the highest indicated severity and the smallest factor has lowest indicated severity.'
-    elif selected_scheme == 'Severity (abs)':
-        return 'The size of the factors in your map corresponds to their absolute severity. The largest factor has the highest possible severity score (10) and the smallest factor has the lowest possible severity score (0).'
-    elif selected_scheme == 'Out-degree':
-        return 'The size of the factors in your map corresponds to their out-degree, which refers to the number of out-going connections. The largest factor has the most out-going connections and the smallest factor has the least out-going connections. Factors with a lot of out-going connections can be seen as main causes in your map.'
-    elif selected_scheme == 'In-degree':
-        return 'The size of the factors in your map corresponds to their in-degree, which refers to the number of incoming connections. The largest factor has the most incoming connections and the smallest factor has the least incoming connections. Factors with a lot of incoming connections can be seen as main effects in your map.'
-    elif selected_scheme == 'Out-/In-degree ratio':
-        return 'The size of the factors in your map corresponds to their out-/in-degree ratio, which is calculated by dividing the number of out-going by the number of incoming connections. The largest factor has many out-going and few incoming connections (active), and the smallest factor has few out-going and many incoming connections (passive).'
-    return 'As a default the size of the factors in your map corresponds to their relative severity. The largest factor has the highest indicated severity and the smallest factor has lowest indicated severity.'
-
-# INLCUDE MAP IN HOME TAB (**)
-# PROGRESS BAR
-# Callback: Download network as image ***
-# edges gone ***
 
 if __name__ == '__main__':
     app.run_server(debug=True, port=8069)
