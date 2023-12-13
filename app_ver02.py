@@ -226,39 +226,43 @@ def update_step(back_clicks, next_clicks, current_step_data):
     Input({'type': 'dynamic-dropdown', 'step': ALL}, 'value')
 )
 def update_hidden_div(values):
-    # Convert values to JSON and return
     return json.dumps(values)
 
-# Callback for updating session-data (dropdowns) based on hidden Div
+# Callback: Update session-data (dropdowns) based on hidden Div
 @app.callback(
     Output('session-data', 'data'),
-    Input('hidden-div', 'children'),
-    [State('session-data', 'data'),
+    Input('next-button', 'n_clicks'),
+    [State('hidden-div', 'children'),
+     State('session-data', 'data'),
      State('current-step', 'data'),
      State('severity-scores', 'data')]
 )
-def update_session_data(json_values, session_data, current_step_data, severity_scores):
+def update_session_data(n_clicks, json_values, session_data, current_step_data, severity_scores):
 
     step = current_step_data.get('step')
     values = json.loads(json_values) if json_values else []
 
-    if len(values) == 1:
-        if step == 1:
-            session_data['dropdowns']['initial-selection']['value'] = values[0]
-            map_add_factors(session_data)
-        elif step == 4:
-            session_data['dropdowns']['target']['value'] = values[0]
-            graph_color(session_data, severity_scores)
+    if n_clicks: 
+        if len(values) == 1:
+            if step == 1:
+                session_data = map_add_factors(session_data, values[0])
+                #session_data['dropdowns']['initial-selection']['value'] = values[0]
+                #map_add_factors(session_data)
+            elif step == 4:
+                session_data['dropdowns']['target']['value'] = values[0]
+                graph_color(session_data, severity_scores)
 
-    elif len(values) == 2:
-        if step == 2: 
-            session_data['dropdowns']['chain1']['value'] = values[0]
-            session_data['dropdowns']['chain2']['value'] = values[1]
-            map_add_chains(session_data)
-        elif step == 3: 
-            session_data['dropdowns']['cycle1']['value'] = values[0]
-            session_data['dropdowns']['cycle2']['value'] = values[1]
-            map_add_cycles(session_data)
+        elif len(values) == 2:
+            if step == 2: 
+                session_data = map_add_chains(session_data, values[0], values[1])
+                #session_data['dropdowns']['chain1']['value'] = values[0]
+                #session_data['dropdowns']['chain2']['value'] = values[1]
+                #print(session_data['edges'])
+                #map_add_chains(session_data)
+            elif step == 3: 
+                #session_data['dropdowns']['cycle1']['value'] = values[0]
+                #session_data['dropdowns']['cycle2']['value'] = values[1]
+                session_data = map_add_cycles(session_data, values[0], values[1])
 
     return session_data
 
@@ -274,9 +278,10 @@ def dropdown_step5_init(value, session_data):
         session_data['add-node'] = value
     return session_data
 
-# Callback: Update session data based on current step (reset if 0)
+# Callback: Reset session data & severity data at "Redo" (step 0)
 @app.callback(
-    [Output('session-data', 'data', allow_duplicate=True)],
+    [Output('session-data', 'data', allow_duplicate=True),
+     Output('severity-scores', 'data', allow_duplicate=True)],
     Input('current-step', 'data'),
     prevent_initial_call=True
 )
@@ -298,10 +303,10 @@ def reset(current_step_data):
             'stylesheet': stylesheet,
             'annotations': []
         }
-        return (data,) 
+        return (data, {}) 
 
     else:
-        return (dash.no_update,)  
+        return (dash.no_update, dash.no_update)  
 
 # Callback: Set edit-graph to session-data if "Load from session" is pressed
 @app.callback(
@@ -311,7 +316,6 @@ def reset(current_step_data):
 )
 def load_session_graph(n_clicks, session_data):
     if n_clicks:
-        # Clone the session_data into edit_map_data
         return session_data
     # Return no update if the button wasn't clicked
     return dash.no_update      
@@ -347,42 +351,6 @@ def upload_graph(contents, filename):
     return dash.no_update
 
 # Callback: Open edit node modal upon clicking it
-# @app.callback(
-#     [Output('node-edit-modal', 'is_open'),
-#      Output('modal-node-name', 'value'),
-#      Output('modal-severity-score', 'value')],
-#     [Input('my-mental-health-map', 'tapNodeData'),
-#      Input('mode-toggle', 'value'),
-#      Input('severity-scores', 'data')],
-#     prevent_initial_call=True
-# )
-# def open_node_edit_modal(tapNodeData, mode, severity_scores):
-#     if mode == 'view' and tapNodeData:
-#         node_id = tapNodeData['id']
-#         node_name = tapNodeData.get('label', node_id)  # Assuming label is stored in tapNodeData
-#         severity_score = severity_scores.get(node_id, 0)  # Assuming severity_scores is accessible
-#         print(severity_score)
-#         return True, node_name, severity_score
-#     return False, None, None
-
-# @app.callback(
-#     [Output('node-edit-modal', 'is_open'),
-#      Output('modal-node-name', 'value'),
-#      Output('modal-severity-score', 'value'),
-#      Output('note-input', 'value')],
-#     [Input('my-mental-health-map', 'tapNodeData'),
-#      Input('mode-toggle', 'value'),
-#      Input('severity-scores', 'data')],
-#     prevent_initial_call=True
-# )
-# def open_node_edit_modal(tapNodeData, mode, severity_scores):
-#     if mode == 'view' and tapNodeData:
-#         node_id = tapNodeData['id']
-#         node_name = tapNodeData.get('label', node_id)  # Use label as the key for severity_scores
-#         severity_score = severity_scores.get(node_name, 0)  # Retrieve severity score using the node name
-#         return True, node_name, severity_score
-#     return False, None, None
-
 @app.callback(
     [Output('node-edit-modal', 'is_open'),
      Output('modal-node-name', 'value'),
@@ -391,7 +359,7 @@ def upload_graph(contents, filename):
     [Input('my-mental-health-map', 'tapNodeData'),
      Input('inspect-switch', 'value'),
      Input('severity-scores', 'data'),
-     State('annotation-data', 'data')],  # Add State for annotation-data
+     State('annotation-data', 'data')],  
     prevent_initial_call=True
 )
 def open_node_edit_modal(tapNodeData, switch, severity_scores, annotations):
@@ -399,10 +367,11 @@ def open_node_edit_modal(tapNodeData, switch, severity_scores, annotations):
         node_id = tapNodeData['id']
         node_name = tapNodeData.get('label', node_id)
         severity_score = severity_scores.get(node_name, 0)
-        annotation = annotations.get(node_id, '')  # Retrieve annotation for the node
+        annotation = annotations.get(node_id, '') 
         return True, node_name, severity_score, annotation
     return False, None, None, ''
 
+# Callback: Update the annotation for the node
 @app.callback(
     Output('annotation-data', 'data'),
     [Input('note-input', 'value')],
@@ -412,7 +381,7 @@ def open_node_edit_modal(tapNodeData, switch, severity_scores, annotations):
 def update_annotations(note_input, tapNodeData, annotations):
     if tapNodeData:
         node_id = tapNodeData['id']
-        annotations[node_id] = note_input  # Update the annotation for the node
+        annotations[node_id] = note_input 
     return annotations
 
 # Callback: Save node edits (name & severity) in graph and edit_map_data
@@ -529,144 +498,6 @@ def update_edge_data_and_close_modal(save_clicks, tapEdgeData, switch, strength,
         return edge_data, True, stylesheet  # Open the modal without updating stylesheet
 
     return edge_data, is_open, stylesheet  # Default return
-
-# def update_edge_data_and_close_modal(save_clicks, tapEdgeData, switch, strength, annotation, edge_data, is_open, edit_map_data):
-#     ctx = callback_context
-#     triggered_id = ctx.triggered[0]['prop_id'].split('.')[0]
-
-#     if edge_data is None:
-#         edge_data = {}
-
-#     if triggered_id == 'edge-save-btn' and tapEdgeData:
-#         edge_id = tapEdgeData['id']
-#         # Update the edge data
-#         edge_data[edge_id] = {
-#             'strength': strength,
-#             'annotation': annotation
-#         }
-#         print(edge_data)
-#         return edge_data, False  # Close the modal
-
-#     # Handle opening the modal
-#     if triggered_id == 'my-mental-health-map' and 0 not in switch and tapEdgeData:
-#         edge_id = tapEdgeData['id']
-#         explanation = f"The factor {tapEdgeData['source']} causes the factor {tapEdgeData['target']}"
-#         strength = edge_data.get(edge_id, {}).get('strength', 3)
-#         annotation = edge_data.get(edge_id, {}).get('annotation', '')
-#         return edge_data, True  # Open the modal
-    
-#     # # extra
-#     # if edge_data:
-#     #     edge_id = tapEdgeData['id']
-#     #     edge_info = edge_data.get(edge_id, {})
-#     #     strength = edge_info.get('strength', 1)
-
-#     #     # Default stylesheet
-#     #     stylesheet = edit_map_data['stylesheet']
-#     #     # Add style for the tapped edge
-#     #     # tapped_edge_style = {
-#     #     #     'selector': f'edge[id="{edge_id}"]',
-#     #     #     'style': {
-#     #     #         'line-color': '#FF4136',  # Example color, change as needed
-#     #     #         'width': 2 + strength * 2,  # Example width formula based on strength
-#     #     #         # You can add more styles here based on strength
-#     #     #     }
-#     #     # }
-#     #     # stylesheet.append(tapped_edge_style)
-
-#     #     opacity = strength / 5
-
-#     #     # Add style for the tapped edge
-#     #     tapped_edge_style = {
-#     #         'selector': f'edge[id="{edge_id}"]',
-#     #         'style': {
-#     #             'line-opacity': opacity,
-#     #             'width': 2 + strength * 2,
-#     #         }
-#     #     }
-#     #     stylesheet.append(tapped_edge_style)
-
-#     return edge_data, is_open, stylesheet  # Default return to maintain the current state
-
-
-# NOT WORKING **
-# @app.callback(
-#     Output('my-mental-health-map', 'stylesheet', allow_duplicate=True),
-#     [Input('edge-data', 'data')],
-#     State('edit-map-data', 'data'),
-#     prevent_initial_call = True
-# )
-# def update_edge_style(edge_data, edit_map_data):
-#     stylesheet = edit_map_data.get('stylesheet', []) if edit_map_data else []
-
-#     if edge_data:
-#         # Create a new list for the updated stylesheet to avoid duplicates
-#         updated_stylesheet = []
-
-#         for rule in stylesheet:
-#             # Copy only the rules that don't involve edges
-#             if not rule['selector'].startswith('#'):
-#                 updated_stylesheet.append(rule)
-
-#         for edge_id, data in edge_data.items():
-#             strength = max(data.get('strength', 1), 1)
-#             opacity = strength / 5
-#             updated_stylesheet.append({
-#                 'selector': f'edge[id = "{edge_id}"]',
-#                 'style': {
-#                     'line-opacity': opacity,
-#                     'color': 'yellow'
-#                 }
-#             })
-
-#         return updated_stylesheet
-
-#     return stylesheet
-
-# @app.callback(
-#     Output('my-mental-health-map', 'stylesheet', allow_duplicate=True),
-#      #Output('edit-map-data', 'data', allow_duplicate=True)],
-#     [Input('my-mental-health-map', 'tapEdgeData')],
-#     [State('edge-data', 'data'), 
-#      State('edit-map-data', 'data')], 
-#      prevent_initial_call=True
-# )
-# def display_edge_strength(tapEdgeData, edge_data, edit_map_data):
-#     if not tapEdgeData or not edge_data:
-#         return dash.no_update
-
-#     edge_id = tapEdgeData['id']
-#     edge_info = edge_data.get(edge_id, {})
-#     strength = edge_info.get('strength', 1)
-
-#     # Default stylesheet
-#     stylesheet = edit_map_data['stylesheet']
-#     # Add style for the tapped edge
-#     # tapped_edge_style = {
-#     #     'selector': f'edge[id="{edge_id}"]',
-#     #     'style': {
-#     #         'line-color': '#FF4136',  # Example color, change as needed
-#     #         'width': 2 + strength * 2,  # Example width formula based on strength
-#     #         # You can add more styles here based on strength
-#     #     }
-#     # }
-#     # stylesheet.append(tapped_edge_style)
-
-#     opacity = strength / 5
-
-#     # Add style for the tapped edge
-#     tapped_edge_style = {
-#         'selector': f'edge[id="{edge_id}"]',
-#         'style': {
-#             'line-opacity': opacity,
-#             'width': 2 + strength * 2,
-#         }
-#     }
-#     stylesheet.append(tapped_edge_style)
-
-#     edit_map_data['stylesheet'] = stylesheet
-
-#     return stylesheet
 
 # Callback: Edit map - add node
 @app.callback(
@@ -829,19 +660,78 @@ def update_likert_scales(selected_factors, severity_scores):
     return [create_likert_scale(factor, severity_scores.get(factor, 0)) for factor in selected_factors]
 
 # Callback: Update severity scores
+# @app.callback(
+#     Output('severity-scores', 'data'),
+#     [Input({'type': 'likert-scale', 'factor': ALL}, 'value')],
+#     State('session-data', 'data')
+# )
+# def update_severity_scores(severity_values, session_data):
+#     severity_scores = {}
+#     factors = session_data['dropdowns']['initial-selection']['value']
+#     if factors and len(severity_values) != 0:
+#         severity_scores = {factor: value for factor, value in zip(factors, severity_values)}
+#     else:
+#         return dash.no_update
+#     return severity_scores
+
+# Callback: Update severity scores
+# @app.callback(
+#     Output('severity-scores', 'data'),
+#     [Input({'type': 'likert-scale', 'factor': ALL}, 'value')],
+#     [State('session-data', 'data'),
+#      State('severity-scores', 'data')]
+# )
+# def update_severity_scores(severity_values, session_data, existing_severity_scores):
+#     # Initialize severity scores if not present
+#     if existing_severity_scores is None:
+#         existing_severity_scores = {}
+
+#     # Get the current list of factors
+#     current_factors = session_data['dropdowns']['initial-selection']['value']
+
+#     # Update the existing severity scores with new values
+#     for factor, value in zip(current_factors, severity_values):
+#         existing_severity_scores[factor] = value
+
+#     # Remove severity scores for factors that are no longer present
+#     factors_to_remove = set(existing_severity_scores.keys()) - set(current_factors)
+#     for factor in factors_to_remove:
+#         existing_severity_scores.pop(factor, None)
+
+#     return existing_severity_scores
+
 @app.callback(
     Output('severity-scores', 'data'),
     [Input({'type': 'likert-scale', 'factor': ALL}, 'value')],
-    State('session-data', 'data')
+    [State('session-data', 'data'),
+     State('severity-scores', 'data')]
 )
-def update_severity_scores(severity_values, session_data):
-    severity_scores = {}
-    factors = session_data['dropdowns']['initial-selection']['value']
-    if factors and len(severity_values) != 0:
-        severity_scores = {factor: value for factor, value in zip(factors, severity_values)}
-    else:
+def update_severity_scores(severity_values, session_data, existing_severity_scores):
+    # Check if severity_values, session_data or existing_severity_scores is None
+    if severity_values is None or session_data is None or existing_severity_scores is None:
         return dash.no_update
-    return severity_scores
+
+    # Initialize severity scores if not present
+    if existing_severity_scores is None:
+        existing_severity_scores = {}
+
+    # Get the current list of factors
+    current_factors = session_data['dropdowns']['initial-selection']['value']
+
+    # Ensure current_factors is not None
+    if current_factors is None:
+        return dash.no_update
+
+    # Update the existing severity scores with new values
+    for factor, value in zip(current_factors, severity_values):
+        existing_severity_scores[factor] = value
+
+    # Remove severity scores for factors that are no longer present
+    factors_to_remove = set(existing_severity_scores.keys()) - set(current_factors)
+    for factor in factors_to_remove:
+        existing_severity_scores.pop(factor, None)
+
+    return existing_severity_scores
 
 # Callback: Update color_scheme dropdown value
 @app.callback(
@@ -975,175 +865,6 @@ def update_modal_content_sizing(selected_scheme):
 # PROGRESS BAR
 # Callback: Download network as image ***
 # edges gone ***
-
-# Callback: Annotation - initialize graph element annotations when in mode
-# @app.callback(
-#     Output('annotation-data', 'data'),
-#     Input('mode-toggle', 'value'),
-#     [State('edit-map-data', 'data'),
-#      State('annotation-data', 'data')],
-#     prevent_initial_call=True
-# )
-# def initialize_annotations(mode, edit_map_data, annotation_data):
-#     if mode == 'annotate':
-#         elements = edit_map_data.get('elements', [])
-#         # Check if annotations are already initialized
-#         if not annotation_data:
-#             annotation_data = {element['data']['id']: "hello" for element in elements if 'id' in element['data']}
-#         return annotation_data
-#     return dash.no_update
-
-# # Callback: Annotation - display graph element annotations when in mode (tooltips)
-# @app.callback(
-#     Output('my-mental-health-map', 'stylesheet', allow_duplicate=True),
-#     [Input('mode-toggle', 'value'),
-#      Input('annotation-data', 'data')],
-#     State('edit-map-data', 'data'),
-#     prevent_initial_call=True
-# )
-# def display_annotations_as_tooltips(mode, annotation_data, edit_map_data):
-#     default_stylesheet = edit_map_data.get('stylesheet', [])
-#     if mode == 'annotate':
-#         annotated_stylesheet = []
-#         for element in default_stylesheet:
-#             # Copy existing styles, but we'll override the 'color' property below
-#             style_copy = element.copy()
-#             annotated_stylesheet.append(style_copy)
-            
-#         for element in edit_map_data.get('elements', []):
-#             id = element['data'].get('id')
-#             label = element['data'].get('label', '')
-#             annotation = annotation_data.get(id, "")
-#             # You may use '\n' to add a new line between the label and the annotation if needed
-#             combined_content = f'{label} {annotation}' if annotation else label
-#             color = 'orange' if annotation else '#000' # Default color if no annotation
-#             # Apply the combined content and color
-#             annotated_stylesheet.append({
-#                 'selector': f'node[id="{id}"], edge[id="{id}"]',
-#                 'style': {
-#                     'content': combined_content,
-#                     'color': color,
-#                     'text-valign': 'center',
-#                     'text-halign': 'center',
-#                     'font-size': 10  # Adjust as needed
-#                 }
-#             })
-#         return annotated_stylesheet
-#     return default_stylesheet
-
-# # Callback: Annotation - display textfield when clicking on node/edge in mode
-# @app.callback(
-#     [Output('annotation-input', 'style'),
-#      Output('save-annotation-btn', 'style'),
-#      Output('annotation-input', 'value')],
-#     [Input('mode-toggle', 'value'),
-#      Input('my-mental-health-map', 'tapNodeData'),
-#      Input('my-mental-health-map', 'tapEdgeData')],
-#     [State('annotation-data', 'data'),  # Use the separate annotation data store
-#      State('annotation-input', 'value')]
-# )
-# def display_annotation_interface(mode, tapNodeData, tapEdgeData, annotation_data, annotation_value):
-#     ctx = dash.callback_context
-
-#     # If the callback was triggered by selecting a node or an edge in annotation mode
-#     if ctx.triggered and mode == 'annotate':
-#         # Determine which element was selected, node or edge
-#         selected_element = tapNodeData if tapNodeData else tapEdgeData
-#         if selected_element:
-#             element_id = selected_element['id']
-#             # Retrieve the existing annotation for the element
-#             existing_annotation = annotation_data.get(element_id, "")
-#             # Show the text area and the save button with the existing annotation
-#             return {'display': 'block'}, {'display': 'block'}, existing_annotation
-
-#     # Hide the interface if not in annotation mode or no element is selected
-#     return {'display': 'none'}, {'display': 'none'}, annotation_value  # Keep the existing value if no new element is selected
-
-# # Callback: Annotation - Save new annotation to edit graph data & display in graph
-# @app.callback(
-#     Output('annotation-data', 'data', allow_duplicate=True),
-#     Input('save-annotation-btn', 'n_clicks'),
-#     [State('my-mental-health-map', 'tapNodeData'),
-#      State('my-mental-health-map', 'tapEdgeData'),
-#      State('annotation-input', 'value'),
-#      State('annotation-data', 'data')],
-#      prevent_initial_call=True
-# )
-# def save_annotation(n_clicks, tapNodeData, tapEdgeData, annotation_value, annotation_data):
-#     # If the Save button is clicked
-#     if n_clicks:
-#         # Determine which element was selected, node or edge
-#         selected_element = tapNodeData if tapNodeData else tapEdgeData
-#         if selected_element:
-#             element_id = selected_element['id']
-#             # Update the annotation data store with the new value
-#             annotation_data[element_id] = annotation_value
-
-#     # Return the updated annotations
-#     return annotation_data
-
-# @app.callback(
-#     # Outputs for initializing annotations and updating the stylesheet
-#     [Output('my-mental-health-map', 'elements', allow_duplicate=True)],
-#     #Output('my-mental-health-map', 'stylesheet', allow_duplicate=True)],
-#     [Input('mode-toggle', 'value'),  # Input from the mode toggle
-#      Input('annotation-data', 'data')],  # Input from the annotation data
-#     [State('edit-map-data', 'data')],
-#     prevent_initial_call = True
-# )
-# def handle_mode_change_and_annotations(mode, annotation_data, edit_map_data):
-#     elements = initialize_annotations(mode, edit_map_data, annotation_data) if mode == 'annotate' else edit_map_data.get('elements', [])
-#     #stylesheet = update_stylesheet_based_on_mode(mode, annotation_data, edit_map_data)
-#     print(elements)
-#     return elements
-
-# @app.callback(
-#     Output('my-mental-health-map', 'stylesheet', allow_duplicate=True),
-#     [Input('mode-toggle', 'value'),
-#      Input('annotation-data', 'data'),
-#      Input('edit-map-data', 'data')],
-#     prevent_initial_call=True
-# )
-# def update_stylesheet_based_on_mode(mode, annotation_data, edit_map_data):
-#     # The default stylesheet for the graph
-#     default_stylesheet = edit_map_data['stylesheet']
-    
-#     # Stylesheet for annotation tooltips
-#     tooltip_stylesheet = [
-#         {
-#             'selector': 'node',
-#             'style': {
-#                 'content': 'data(label)',
-#                 'text-valign': 'center',
-#                 'text-halign': 'center'
-#             }
-#         },
-#         {
-#             "selector": "node:hover",
-#             "style": {
-#                 "content": "data(tooltip)",
-#                 "text-max-width": "150px",
-#                 "font-size": "12px",
-#                 "text-wrap": "wrap",
-#                 "text-valign": "top",
-#                 "text-halign": "right",
-#                 "text-margin-y": "-15px",
-#                 "text-background-color": "#FFF",
-#                 "text-background-opacity": "0.7",
-#                 "text-border-color": "#000",
-#                 "text-border-width": "1px",
-#                 "text-border-opacity": "1",
-#                 "z-index": "9999"
-#             }
-#         }
-#     ]
-    
-#     # If we are in annotation mode, return the combined default and tooltip stylesheets
-#     if mode == 'annotate':
-#         return default_stylesheet + tooltip_stylesheet
-#     # Otherwise, return the default stylesheet
-#     else:
-#         return default_stylesheet
 
 if __name__ == '__main__':
     app.run_server(debug=True, port=8069)

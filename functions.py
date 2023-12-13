@@ -130,6 +130,7 @@ def generate_step_content(step, session_data):
         elements = session_data.get('elements', [])
         selected_factors = session_data['add-nodes'] or []
         options = [{'label': factor, 'value': factor} for factor in selected_factors]
+        print(elements)
         return html.Div([
             html.Div([
                 # Graph Container
@@ -281,7 +282,6 @@ def create_mental_health_map_tab(edit_map_data, color_scheme_data, sizing_scheme
                 html.Br(),
 
                 html.Div([
-                    #dbc.Label("Toggle a bunch"),
                     dbc.Checklist(options=[{"label": "Inspect", "value": 0}],
                                  value=[1],
                                  id="inspect-switch",
@@ -292,45 +292,44 @@ def create_mental_health_map_tab(edit_map_data, color_scheme_data, sizing_scheme
                                ], id="modal-inspect"),
                                ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'}), 
 
-            #     html.Br(), html.Br(),
-            #     html.Div([toggle]),
-            #     html.Br(), html.Br(),
-            #     html.Div(id='annotation-interface', children=[
-            #         html.Div(
-            #         dcc.Textarea(
-            #             id='annotation-input',
-            #             value='',
-            #             className='custom-textarea',
-            #             style={
-            #                 'display': 'none',
-            #                 'flex': '1',  # Flex for input to take available space
-            #                 'fontSize': '0.9em',  # Adjust font size to make textbox smaller
-            #                 'resize': 'none'
-            #             }
-            #         ),
-            #         style={'flex': '1', 'marginRight': '3px', 
-            #                'borderRadius': '10px !important'}  # Margin applied to the wrapper div
-            #     ),
-            #     html.Div(
-            #         dbc.Button('💾', id='save-annotation-btn', style={'display': 'none'}),
-            #         style={'flex': 'none'}  # This div doesn't grow or shrink
-            #     )
-            # ], style={
-            #     'display': 'flex', 
-            #     'alignItems': 'center', 
-            #     'marginBottom': '10px'
-            # })
-
             ], style={'width': '300px', 'padding': '10px', 'marginTop': '80px'})
         
         ], style={'display': 'flex', 'height': '470px', 'alignItems': 'flex-start'}),
     ])
 
 # Function: Initiate graph with elements
-def map_add_factors(session_data):
-    selected_factors = session_data['dropdowns']['initial-selection']['value'] or []
-    map_elements = [{'data': {'id': factor, 'label': factor}} for factor in selected_factors]
-    session_data['elements'] = map_elements
+def map_add_factors(session_data, value):
+    if value is None:
+        value = []
+
+    current_selection = value
+    previous_selection = session_data['dropdowns']['initial-selection']['value'] or []
+
+    # Initialize or clear elements list
+    session_data['elements'] = []
+
+    if current_selection:
+        # Add factor nodes
+        for factor in current_selection:
+            session_data['elements'].append({'data': {'id': factor, 'label': factor}})
+
+        # Identify factors that are no longer selected
+        removed_factors = [factor for factor in previous_selection if factor not in current_selection]
+
+        # Update the edges
+        if 'edges' in session_data:
+            updated_edges = []
+            for edge in session_data['edges']:
+                source, target = edge.split('->')
+                if source in current_selection and target in current_selection:
+                    updated_edges.append(edge)
+                    # Adding edge elements
+                    session_data['elements'].append({'data': {'source': source, 'target': target, 'id': edge}})
+            session_data['edges'] = updated_edges
+
+    # Update the previous selection
+    session_data['dropdowns']['initial-selection']['value'] = current_selection
+
     return session_data
 
 # Function: Add an edge 
@@ -353,34 +352,140 @@ def delete_edge(source, target, elements, existing_edges):
     return elements, existing_edges
 
 # Function: Include causal chains into the map  
-def map_add_chains(session_data):
+# def map_add_chains(session_data, chain1, chain2):
+#     map_elements = session_data['elements']
+#     existing_edges = set(session_data['edges'])
+#     previous_chain1 = session_data['dropdowns']['chain1']['value'] or []
+#     previous_chain2 = session_data['dropdowns']['chain2']['value'] or []
+
+#     # Function to check if a factor exists in elements
+#     def factor_exists(factor, elements):
+#         return any(element.get('data', {}).get('id') == factor for element in elements)
+
+#     # Process chain1 and chain2
+#     for chain in [chain1, chain2]:
+#         if chain is not None:
+#             for i in range(len(chain) - 1):
+#                 source, target = chain[i], chain[i + 1]
+#                 if factor_exists(source, map_elements) and factor_exists(target, map_elements):
+#                     add_edge(source, target, map_elements, existing_edges)
+
+#     session_data['elements'] = map_elements
+#     session_data['dropdowns']['chain1']['value'] = chain1
+#     session_data['dropdowns']['chain2']['value'] = chain2
+#     session_data['edges'] = list(existing_edges)
+
+#     return session_data
+
+# Function to check if a factor exists in elements
+def factor_exists(factor, elements):
+    return any(element.get('data', {}).get('id') == factor for element in elements)
+    
+def remove_chain_edges(chain, elements, existing_edges):
+    for i in range(len(chain) - 1):
+        source, target = chain[i], chain[i + 1]
+        elements[:] = [e for e in elements if not ('source' in e.get('data', {}) and e['data']['source'] == source and e['data']['target'] == target)]
+        # Remove from existing_edges
+        existing_edges[:] = [e for e in existing_edges if not ('source' in e.get('data', {}) and e['data']['source'] == source and e['data']['target'] == target)]
+
+# Function to add an edge to the elements
+def add_edge_new(source, target, elements):
+    edge_data = {'data': {'source': source, 'target': target}}
+    if not any(e.get('data') == edge_data['data'] for e in elements):
+        elements.append(edge_data)
+
+def map_add_chains(session_data, chain1, chain2):
     map_elements = session_data['elements']
-    chain1_elements = session_data['dropdowns']['chain1']['value']
-    chain2_elements = session_data['dropdowns']['chain2']['value']
-    existing_edges = set(session_data['edges'])
-    if chain1_elements and len(chain1_elements) == 2:
-        add_edge(chain1_elements[0], chain1_elements[1], map_elements, existing_edges)
-    if chain2_elements and len(chain2_elements) == 2:
-        add_edge(chain2_elements[0], chain2_elements[1], map_elements, existing_edges)
+    previous_chain1 = session_data['dropdowns']['chain1']['value'] or []
+    previous_chain2 = session_data['dropdowns']['chain2']['value'] or []
+    existing_edges = session_data['edges']
+
+    # Remove previous selections from elements
+    for selection in [previous_chain1, previous_chain2]:
+        remove_chain_edges(selection, map_elements, existing_edges)
+
+    # Process chain1 and chain2
+    for chain in [chain1, chain2]:
+        if chain is not None:
+            for i in range(len(chain) - 1):
+                source, target = chain[i], chain[i + 1]
+                if factor_exists(source, map_elements) and factor_exists(target, map_elements):
+                    add_edge_new(source, target, map_elements)
+
     session_data['elements'] = map_elements
-    session_data['edges'] = list(existing_edges)
-    return session_data, existing_edges
+    session_data['dropdowns']['chain1']['value'] = chain1
+    session_data['dropdowns']['chain2']['value'] = chain2
+    session_data['edges'] = existing_edges
+
+    return session_data
 
 # Function: Add vicious cycles into the map 
-def map_add_cycles(session_data):
+# def map_add_cycles(session_data, cycle1, cycle2):
+#     map_elements = session_data['elements']
+#     existing_edges = set(session_data['edges'])
+
+#     for cycle in [cycle1, cycle2]:
+#         if cycle is not None:
+#             # If the cycle has only one element, create a self-reinforcing loop
+#             if len(cycle) == 1:
+#                 # Create a self-reinforcing loop for single-element cycles
+#                 element = cycle[0]
+#                 if factor_exists(element, map_elements):
+#                     add_edge(element, element, map_elements, existing_edges)
+#             if len(cycle) > 1:
+#                 # Create a loop that connects each element to the next, and the last element to the first
+#                 for i in range(len(cycle)):
+#                     source = cycle[i]
+#                     target = cycle[0] if i == len(cycle) - 1 else cycle[i + 1]
+#                     if factor_exists(source, map_elements) and factor_exists(target, map_elements):
+#                         add_edge(source, target, map_elements, existing_edges)
+
+#     session_data['elements'] = map_elements
+#     session_data['edges'] = list(existing_edges)
+#     session_data['dropdowns']['cycle1']['value'] = cycle1
+#     session_data['dropdowns']['cycle2']['value'] = cycle2
+#     return session_data
+
+def remove_cycle_edges(cycle, elements, existing_edges):
+    for i in range(len(cycle)):
+        source = cycle[i]
+        target = cycle[0] if i == len(cycle) - 1 else cycle[i + 1]
+        # Remove from elements
+        elements[:] = [e for e in elements if not ('source' in e.get('data', {}) and e['data']['source'] == source and e['data']['target'] == target)]
+        edge_tuple = (source, target)
+        existing_edges.discard(edge_tuple)
+
+def map_add_cycles(session_data, cycle1, cycle2):
     map_elements = session_data['elements']
-    cycle1_elements = session_data['dropdowns']['cycle1']['value']
-    cycle2_elements = session_data['dropdowns']['cycle2']['value']
     existing_edges = set(session_data['edges'])
-    if cycle1_elements and len(cycle1_elements) == 2:
-        add_edge(cycle1_elements[0], cycle1_elements[1], map_elements, existing_edges)
-        add_edge(cycle1_elements[1], cycle1_elements[0], map_elements, existing_edges)
-    if cycle2_elements and len(cycle2_elements) == 3:
-        add_edge(cycle2_elements[0], cycle2_elements[1], map_elements, existing_edges)
-        add_edge(cycle2_elements[1], cycle2_elements[2], map_elements, existing_edges)
-        add_edge(cycle2_elements[2], cycle2_elements[0], map_elements, existing_edges)
+
+    # Get previous cycles
+    previous_cycle1 = session_data['dropdowns']['cycle1']['value'] or []
+    previous_cycle2 = session_data['dropdowns']['cycle2']['value'] or []
+
+    # Remove previous cycles
+    for cycle in [previous_cycle1, previous_cycle2]:
+        remove_cycle_edges(cycle, map_elements, existing_edges)
+
+    # Add new cycles
+    for cycle in [cycle1, cycle2]:
+        if cycle is not None:
+            if len(cycle) == 1:
+                element = cycle[0]
+                if factor_exists(element, map_elements):
+                    add_edge_new(element, element, map_elements)
+            elif len(cycle) > 1:
+                for i in range(len(cycle)):
+                    source = cycle[i]
+                    target = cycle[0] if i == len(cycle) - 1 else cycle[i + 1]
+                    if factor_exists(source, map_elements) and factor_exists(target, map_elements):
+                        add_edge_new(source, target, map_elements)
+
     session_data['elements'] = map_elements
     session_data['edges'] = list(existing_edges)
+    session_data['dropdowns']['cycle1']['value'] = cycle1
+    session_data['dropdowns']['cycle2']['value'] = cycle2
+    
     return session_data
 
 # Function: Normalize        
@@ -664,46 +769,3 @@ def graph_color(session_data, severity_scores):
     session_data = node_sizing(chosen_scheme="Severity", graph_data=session_data, severity_scores=severity_scores)
 
     return session_data
-
-# Function: Initialize annotation tooltips
-# def initialize_annotations(mode, edit_map_data, annotation_data):
-#     if mode == 'annotate':
-#         elements = edit_map_data.get('elements', [])
-#         for element in elements:
-#             if 'id' in element['data']:
-#                 node_id = element['data']['id']
-#                 annotation = annotation_data.get(node_id, "No annotation")
-#                 element['data']['tooltip'] = annotation  # Add tooltip content
-#         return elements
-#     return dash.no_update
-
-# Function: Update stylesheet with tooltips
-# def update_stylesheet_based_on_mode(mode, edit_map_data):
-#     default_stylesheet = edit_map_data.get('stylesheet', [])
-#     if mode == 'annotate':
-#         tooltip_stylesheet = [
-#             {
-#                 'selector': 'node',
-#                 'style': {
-#                     'content': 'data(label)'  # Display the node label
-#                 }
-#             },
-#             {
-#                 'selector': 'node:hover',
-#                 'style': {
-#                     'content': 'data(tooltip)',  # Display the tooltip content on hover
-#                     'text-valign': 'center',
-#                     'text-halign': 'center',
-#                     'background-color': '#fff',
-#                     'border-color': '#000',
-#                     'border-width': '1px',
-#                     'border-style': 'solid',
-#                     'font-size': '12px',
-#                     'padding': '5px',
-#                     'z-index': '9999'
-#                 }
-#             }
-#         ]
-#         return default_stylesheet + tooltip_stylesheet
-#     else:
-#         return default_stylesheet
