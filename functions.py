@@ -1,5 +1,5 @@
 # Imports 
-from constants import factors, node_color, node_size, toggle
+from constants import factors, node_color, node_size
 import dash
 from dash import dcc, html
 from dash.dependencies import Input, Output, State, MATCH, ALL
@@ -298,7 +298,7 @@ def create_mental_health_map_tab(edit_map_data, color_scheme_data, sizing_scheme
     ])
 
 # Function: Initiate graph with elements
-def map_add_factors(session_data, value):
+def map_add_factors(session_data, value, severity_score):
     if value is None:
         value = []
 
@@ -315,6 +315,11 @@ def map_add_factors(session_data, value):
 
         # Identify factors that are no longer selected
         removed_factors = [factor for factor in previous_selection if factor not in current_selection]
+
+        # Remove these factors from severity data (dictionary)
+        for factor in removed_factors:
+            if factor in severity_score:
+                del severity_score[factor]
 
         # Update the edges
         if 'edges' in session_data:
@@ -341,15 +346,22 @@ def add_edge(source, target, elements, existing_edges):
             return elements, existing_edges
         
 # Function: Delete an edge
+# def delete_edge(source, target, elements, existing_edges):
+#     edge_key = f"{source}->{target}"
+#     if edge_key in existing_edges:
+#         for i in range(len(elements) - 1, -1, -1):
+#             if elements[i].get('data', {}).get('source') == source and elements[i].get('data', {}).get('target') == target:
+#                 del elements[i]
+#                 break
+#         existing_edges.remove(edge_key)
+#     return elements, existing_edges
+
 def delete_edge(source, target, elements, existing_edges):
-    edge_key = f"{source}->{target}"
-    if edge_key in existing_edges:
-        for i in range(len(elements) - 1, -1, -1):
-            if elements[i].get('data', {}).get('source') == source and elements[i].get('data', {}).get('target') == target:
-                del elements[i]
-                break
-        existing_edges.remove(edge_key)
-    return elements, existing_edges
+    # Remove the edge from elements
+    elements[:] = [element for element in elements if not ('source' in element.get('data', {}) and element['data']['source'] == source and 'target' in element.get('data', {}) and element['data']['target'] == target)]
+    
+    # Remove the edge from existing_edges if it's stored as a tuple (source, target)
+    existing_edges.discard((source, target))
 
 # Function: Include causal chains into the map  
 # def map_add_chains(session_data, chain1, chain2):
@@ -504,6 +516,7 @@ def get_color(value):
 
 # Function: Calculate degree centrality
 def calculate_degree_centrality(elements, degrees):
+    print(elements)
     for element in elements:
         if 'source' in element['data']:
             source = element['data']['source']

@@ -12,21 +12,21 @@ node_color = ["Uniform", "Severity", "Severity (abs)", "Out-degree", "In-degree"
 # Initialize node sizing schemes
 node_size = ["Uniform", "Severity", "Severity (abs)", "Out-degree", "In-degree", "Out-/In-degree ratio"] 
 
-toggle = dbc.Form(
-    [
-        dbc.RadioItems(
-            id="mode-toggle",
-            className="btn-group",
-            inputClassName="btn-check",
-            labelClassName="btn btn-outline-primary",
-            labelCheckedClassName="active",
-            options=[
-                {"label": "View", "value": "view"},
-                {"label": "Inspect", "value": "inspect"},
-                {"label": "Annotate", "value": "annotate"},
-            ],
-            value="view",
-        ),
-    ],
-    className="radio-group",
-)
+# toggle = dbc.Form(
+#     [
+#         dbc.RadioItems(
+#             id="mode-toggle",
+#             className="btn-group",
+#             inputClassName="btn-check",
+#             labelClassName="btn btn-outline-primary",
+#             labelCheckedClassName="active",
+#             options=[
+#                 {"label": "View", "value": "view"},
+#                 {"label": "Inspect", "value": "inspect"},
+#                 {"label": "Annotate", "value": "annotate"},
+#             ],
+#             value="view",
+#         ),
+#     ],
+#     className="radio-group",
+# )

@@ -1,6 +1,6 @@
 # Current Version mental-health map tab
 
-from constants import factors, node_color, node_size, toggle
+from constants import factors, node_color, node_size
 from functions import generate_step_content, create_mental_health_map_tab, create_likert_scale, create_iframe, create_dropdown
 from functions import map_add_chains, map_add_cycles, map_add_factors, add_edge, delete_edge, graph_color, color_scheme, node_sizing
 from functions import apply_centrality_color_styles, apply_centrality_size_styles, apply_severity_color_styles, apply_severity_size_styles, apply_uniform_color_styles, apply_uniform_size_styles
@@ -231,9 +231,9 @@ def update_hidden_div(values):
 # Callback: Update session-data (dropdowns) based on hidden Div
 @app.callback(
     Output('session-data', 'data'),
-    Input('next-button', 'n_clicks'),
-    [State('hidden-div', 'children'),
-     State('session-data', 'data'),
+    [Input('next-button', 'n_clicks'),
+    Input('hidden-div', 'children')],
+    [State('session-data', 'data'),
      State('current-step', 'data'),
      State('severity-scores', 'data')]
 )
@@ -242,13 +242,21 @@ def update_session_data(n_clicks, json_values, session_data, current_step_data, 
     step = current_step_data.get('step')
     values = json.loads(json_values) if json_values else []
 
-    if n_clicks: 
-        if len(values) == 1:
+    if len(values) == 1:
             if step == 1:
-                session_data = map_add_factors(session_data, values[0])
+                session_data = map_add_factors(session_data, values[0], severity_scores)
                 #session_data['dropdowns']['initial-selection']['value'] = values[0]
                 #map_add_factors(session_data)
-            elif step == 4:
+
+    if n_clicks: 
+        if len(values) == 1:
+            # if step == 1:
+            #     session_data = map_add_factors(session_data, values[0], severity_scores)
+            #     print(session_data['dropdowns']['initial-selection']['value'])
+            #     print(severity_scores)
+            #     #session_data['dropdowns']['initial-selection']['value'] = values[0]
+            #     #map_add_factors(session_data)
+            if step == 4:
                 session_data['dropdowns']['target']['value'] = values[0]
                 graph_color(session_data, severity_scores)
 
@@ -368,8 +376,18 @@ def open_node_edit_modal(tapNodeData, switch, severity_scores, annotations):
         node_name = tapNodeData.get('label', node_id)
         severity_score = severity_scores.get(node_name, 0)
         annotation = annotations.get(node_id, '') 
+
         return True, node_name, severity_score, annotation
     return False, None, None, ''
+
+# Reset tabnodedata on mode switch
+@app.callback(
+    Output('my-mental-health-map', 'tapNodeData'),  # Assuming 'tabNode' is the component storing the node data
+    Input('inspect-switch', 'value'),  # Assuming 'mode-switch' keeps track of the current mode
+    prevent_initial_call=True
+)
+def reset_node_data_on_click(switch):
+    return {}
 
 # Callback: Update the annotation for the node
 @app.callback(
@@ -540,7 +558,11 @@ def map_add_node(n_clicks, node_name, elements, edit_map_data, severity_scores):
 )
 def delete_node(n_clicks, node_id, elements, edit_map_data, severity_scores):
     if n_clicks and node_id:
+        # Delete node from elements
         elements = [element for element in elements if element['data'].get('id') != node_id]
+        # Delete any existing edges from elements which contain this node
+        elements = [element for element in elements if not (('source' in element['data'] and element['data']['source'] == node_id) or ('target' in element['data'] and element['data']['target'] == node_id))]
+
         if node_id in severity_scores:
             del severity_scores[node_id]  # Remove node from severity scores
 
@@ -548,6 +570,7 @@ def delete_node(n_clicks, node_id, elements, edit_map_data, severity_scores):
     edit_map_data['add-nodes'] = node_names
     edit_map_data['elements'] = elements
 
+    print(severity_scores)
     return elements, node_names, edit_map_data, severity_scores
 
 # Callback: Limit dropdown for edit-edge to 2
@@ -561,6 +584,24 @@ def limit_dropdown_edit_edge(edit_edge):
     return edit_edge
 
 # Callback: Add additional edge to graph
+# @app.callback(
+#     [Output('my-mental-health-map', 'elements', allow_duplicate=True),
+#      Output('edit-map-data', 'data', allow_duplicate=True)],
+#     [Input('btn-plus-edge', 'n_clicks')],
+#     [State('edit-edge', 'value'),
+#      State('my-mental-health-map', 'elements'),
+#      State('edit-map-data', 'data')],
+#      prevent_initial_call=True
+# )
+# def add_edge_output(n_clicks, new_edge, elements, edit_map_data):
+#     if n_clicks and new_edge and len(new_edge) == 2:
+#         source = new_edge[0]
+#         target = new_edge[1]
+#         existing_edges = set(edit_map_data['edges'])
+#         add_edge(source, target, elements, existing_edges)
+#         edit_map_data['edges'] = list(existing_edges)
+#         edit_map_data['elements'] = elements
+#     return elements, edit_map_data
 @app.callback(
     [Output('my-mental-health-map', 'elements', allow_duplicate=True),
      Output('edit-map-data', 'data', allow_duplicate=True)],
@@ -572,15 +613,38 @@ def limit_dropdown_edit_edge(edit_edge):
 )
 def add_edge_output(n_clicks, new_edge, elements, edit_map_data):
     if n_clicks and new_edge and len(new_edge) == 2:
-        source = new_edge[0]
-        target = new_edge[1]
-        existing_edges = set(edit_map_data['edges'])
+        source, target = new_edge
+        # Assuming edit_map_data['edges'] is a list of edge dictionaries
+        existing_edges = set(f"{e['data']['source']}->{e['data']['target']}" for e in elements if 'source' in e.get('data', {}))
+
         add_edge(source, target, elements, existing_edges)
-        edit_map_data['edges'] = list(existing_edges)
+
+        edit_map_data['edges'] = [{'data': {'source': source, 'target': target}} for source, target in (edge.split('->') for edge in existing_edges)]
         edit_map_data['elements'] = elements
+
     return elements, edit_map_data
 
+
 # Callback: Delete existing edge from graph
+# @app.callback(
+#     [Output('my-mental-health-map', 'elements', allow_duplicate=True),
+#      Output('edit-map-data', 'data', allow_duplicate=True)],
+#     [Input('btn-minus-edge', 'n_clicks')],
+#     [State('edit-edge', 'value'),
+#      State('my-mental-health-map', 'elements'),
+#      State('edit-map-data', 'data')],
+#      prevent_initial_call=True
+# )
+# def delete_edge_output(n_clicks, edge, elements, edit_map_data):
+#     if n_clicks and edge and len(edge) == 2:
+#         source = edge[0]
+#         target = edge[1]
+#         existing_edges = set(edit_map_data['edges'])
+#         delete_edge(source, target, elements, existing_edges)
+#         edit_map_data['edges'] = list(existing_edges)
+#         edit_map_data['elements'] = elements
+#     return elements, edit_map_data
+
 @app.callback(
     [Output('my-mental-health-map', 'elements', allow_duplicate=True),
      Output('edit-map-data', 'data', allow_duplicate=True)],
@@ -592,12 +656,16 @@ def add_edge_output(n_clicks, new_edge, elements, edit_map_data):
 )
 def delete_edge_output(n_clicks, edge, elements, edit_map_data):
     if n_clicks and edge and len(edge) == 2:
-        source = edge[0]
-        target = edge[1]
-        existing_edges = set(edit_map_data['edges'])
+        source, target = edge
+
+        # Assuming existing_edges is a set of tuples (source, target)
+        existing_edges = set([(e['data']['source'], e['data']['target']) for e in elements if 'source' in e.get('data', {})])
+
         delete_edge(source, target, elements, existing_edges)
+
         edit_map_data['edges'] = list(existing_edges)
         edit_map_data['elements'] = elements
+
     return elements, edit_map_data
 
 # Callback: Listens to color scheme user input 
@@ -727,9 +795,9 @@ def update_severity_scores(severity_values, session_data, existing_severity_scor
         existing_severity_scores[factor] = value
 
     # Remove severity scores for factors that are no longer present
-    factors_to_remove = set(existing_severity_scores.keys()) - set(current_factors)
-    for factor in factors_to_remove:
-        existing_severity_scores.pop(factor, None)
+    # factors_to_remove = set(existing_severity_scores.keys()) - set(current_factors)
+    # for factor in factors_to_remove:
+    #     existing_severity_scores.pop(factor, None)
 
     return existing_severity_scores
 
