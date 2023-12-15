@@ -63,8 +63,7 @@ nav_col = dbc.Col(
         html.Hr(),
         dbc.Nav(
             [
-                dbc.NavLink("Home", href="/", active="exact"),
-                dbc.NavLink("Psychoeducation", href="/psysys-session", active="exact"),
+                dbc.NavLink("Psychoeducation", href="/", active="exact"),
                 dbc.NavLink("Edit My Map", href="/my-mental-health-map", active="exact"),
                 dbc.NavLink("Track My Map", href="/track-my-mental-health-map", active="exact")
             ],
@@ -136,12 +135,6 @@ app.layout = dbc.Container([
     dcc.Download(id='download-link')
 ])
 
-# Define content for Home tab
-home_page = html.Div([
-    html.H1("Welcome to PsySys App!"),
-    html.P("This is the Home tab. More content to come!")
-])
-
 # Callback: Display the page & next/back button based on current step 
 @app.callback(
     [Output('page-content', 'children'),
@@ -166,9 +159,6 @@ def update_page_and_buttons(pathname, edit_map_data, current_step_data, session_
 
     # Update content and button states based on the pathname and step
     if pathname == '/':
-        content = home_page
-        next_button_style = hidden_style  # Both buttons hidden
-    elif pathname == '/psysys-session':
         # Check the step and update accordingly
         if step == 0:
             content = generate_step_content(step, session_data)
@@ -245,17 +235,9 @@ def update_session_data(n_clicks, json_values, session_data, current_step_data, 
     if len(values) == 1:
             if step == 1:
                 session_data = map_add_factors(session_data, values[0], severity_scores)
-                #session_data['dropdowns']['initial-selection']['value'] = values[0]
-                #map_add_factors(session_data)
 
     if n_clicks: 
         if len(values) == 1:
-            # if step == 1:
-            #     session_data = map_add_factors(session_data, values[0], severity_scores)
-            #     print(session_data['dropdowns']['initial-selection']['value'])
-            #     print(severity_scores)
-            #     #session_data['dropdowns']['initial-selection']['value'] = values[0]
-            #     #map_add_factors(session_data)
             if step == 4:
                 session_data['dropdowns']['target']['value'] = values[0]
                 graph_color(session_data, severity_scores)
@@ -263,13 +245,7 @@ def update_session_data(n_clicks, json_values, session_data, current_step_data, 
         elif len(values) == 2:
             if step == 2: 
                 session_data = map_add_chains(session_data, values[0], values[1])
-                #session_data['dropdowns']['chain1']['value'] = values[0]
-                #session_data['dropdowns']['chain2']['value'] = values[1]
-                #print(session_data['edges'])
-                #map_add_chains(session_data)
             elif step == 3: 
-                #session_data['dropdowns']['cycle1']['value'] = values[0]
-                #session_data['dropdowns']['cycle2']['value'] = values[1]
                 session_data = map_add_cycles(session_data, values[0], values[1])
 
     return session_data

@@ -393,12 +393,25 @@ def delete_edge(source, target, elements, existing_edges):
 def factor_exists(factor, elements):
     return any(element.get('data', {}).get('id') == factor for element in elements)
     
-def remove_chain_edges(chain, elements, existing_edges):
+# def remove_chain_edges(chain, elements, existing_edges):
+#     for i in range(len(chain) - 1):
+#         source, target = chain[i], chain[i + 1]
+#         elements[:] = [e for e in elements if not ('source' in e.get('data', {}) and e['data']['source'] == source and e['data']['target'] == target)]
+#         # Remove from existing_edges
+#         existing_edges[:] = [e for e in existing_edges if not ('source' in e.get('data', {}) and e['data']['source'] == source and e['data']['target'] == target)]
+
+def remove_chain_edges(chain, elements, existing_edges, cycles):
+    cycle_edges = set()
+    for cycle in cycles:
+        for i in range(len(cycle) - 1):
+            cycle_edges.add((cycle[i], cycle[i + 1]))
+
     for i in range(len(chain) - 1):
-        source, target = chain[i], chain[i + 1]
-        elements[:] = [e for e in elements if not ('source' in e.get('data', {}) and e['data']['source'] == source and e['data']['target'] == target)]
-        # Remove from existing_edges
-        existing_edges[:] = [e for e in existing_edges if not ('source' in e.get('data', {}) and e['data']['source'] == source and e['data']['target'] == target)]
+        edge = (chain[i], chain[i + 1])
+        # Only remove edge if it's not in any of the cycles
+        if edge not in cycle_edges:
+            elements[:] = [e for e in elements if not ('source' in e.get('data', {}) and e['data']['source'] == edge[0] and 'target' in e.get('data', {}) and e['data']['target'] == edge[1])]
+            existing_edges[:] = [e for e in existing_edges if not ('source' in e.get('data', {}) and e['data']['source'] == edge[0] and e['data']['target'] == edge[1])]
 
 # Function to add an edge to the elements
 def add_edge_new(source, target, elements):
@@ -410,11 +423,16 @@ def map_add_chains(session_data, chain1, chain2):
     map_elements = session_data['elements']
     previous_chain1 = session_data['dropdowns']['chain1']['value'] or []
     previous_chain2 = session_data['dropdowns']['chain2']['value'] or []
+    cycle1 = session_data['dropdowns']['cycle1']['value'] or []
+    cycle2 = session_data['dropdowns']['cycle2']['value'] or []
+
     existing_edges = session_data['edges']
 
     # Remove previous selections from elements
     for selection in [previous_chain1, previous_chain2]:
-        remove_chain_edges(selection, map_elements, existing_edges)
+        # Only remove if this edge is not contained in session_data['dropdowns']['cycle1']['value']
+        # remove_chain_edges(selection, map_elements, existing_edges)
+        remove_chain_edges(selection, map_elements, existing_edges, [cycle1, cycle2])
 
     # Process chain1 and chain2
     for chain in [chain1, chain2]:
@@ -458,14 +476,34 @@ def map_add_chains(session_data, chain1, chain2):
 #     session_data['dropdowns']['cycle2']['value'] = cycle2
 #     return session_data
 
-def remove_cycle_edges(cycle, elements, existing_edges):
+# def remove_cycle_edges(cycle, elements, existing_edges):
+#     for i in range(len(cycle)):
+#         source = cycle[i]
+#         target = cycle[0] if i == len(cycle) - 1 else cycle[i + 1]
+#         # Remove from elements
+#         elements[:] = [e for e in elements if not ('source' in e.get('data', {}) and e['data']['source'] == source and e['data']['target'] == target)]
+#         edge_tuple = (source, target)
+#         existing_edges.discard(edge_tuple)
+
+def remove_cycle_edges(cycle, elements, existing_edges, chains):
+    # Gather all edges from chain1 and chain2
+    chain_edges = set()
+    for chain in chains:
+        if chain:
+            for i in range(len(chain) - 1):
+                chain_edges.add((chain[i], chain[i + 1]))
+
+    # Remove edges from the cycle if they are not in the chains
     for i in range(len(cycle)):
         source = cycle[i]
         target = cycle[0] if i == len(cycle) - 1 else cycle[i + 1]
-        # Remove from elements
-        elements[:] = [e for e in elements if not ('source' in e.get('data', {}) and e['data']['source'] == source and e['data']['target'] == target)]
-        edge_tuple = (source, target)
-        existing_edges.discard(edge_tuple)
+        edge = (source, target)
+
+        # Only remove edge if it's not in chain1 or chain2
+        if edge not in chain_edges:
+            elements[:] = [e for e in elements if not ('source' in e.get('data', {}) and e['data']['source'] == source and 'target' in e.get('data', {}) and e['data']['target'] == target)]
+            existing_edges.discard(edge)
+
 
 def map_add_cycles(session_data, cycle1, cycle2):
     map_elements = session_data['elements']
@@ -475,9 +513,13 @@ def map_add_cycles(session_data, cycle1, cycle2):
     previous_cycle1 = session_data['dropdowns']['cycle1']['value'] or []
     previous_cycle2 = session_data['dropdowns']['cycle2']['value'] or []
 
+    chain1 = session_data['dropdowns']['chain1']['value'] or []
+    chain2 = session_data['dropdowns']['chain2']['value'] or []
+
     # Remove previous cycles
     for cycle in [previous_cycle1, previous_cycle2]:
-        remove_cycle_edges(cycle, map_elements, existing_edges)
+        #remove_cycle_edges(cycle, map_elements, existing_edges)
+        remove_cycle_edges(cycle, map_elements, existing_edges, [chain1, chain2])
 
     # Add new cycles
     for cycle in [cycle1, cycle2]:
