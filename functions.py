@@ -50,6 +50,8 @@ def generate_step_content(step, session_data):
     if step == 0:
         return html.Div([
             html.Br(), html.Br(), html.Br(),
+            dbc.Progress(value=0, striped=True, color="primary", style={"width": "66.5%"}),
+            html.Br(),
             create_iframe("https://www.youtube.com/embed/d8ZZyuESXcU?si=CYvKNlf17wnzt4iG"),
             html.Br(), html.Br(),
             html.P("Please watch this video and begin with the PsySys session.")
@@ -62,6 +64,8 @@ def generate_step_content(step, session_data):
         text = 'Select factors'
         return html.Div([
             html.Br(), html.Br(), html.Br(),
+            dbc.Progress(value=0, striped=True, color="primary", style={"width": "66.5%"}),
+            html.Br(),
             create_iframe("https://www.youtube.com/embed/ttLzT4U2F2I?si=xv1ETjdc1uGROZTo"),
             html.Br(), html.Br(),
             html.P("Please watch the video. Below choose the factors you are currently dealing with."),
@@ -81,6 +85,8 @@ def generate_step_content(step, session_data):
         text = 'Select two factors'
         return html.Div([
             html.Br(), html.Br(), html.Br(),
+            dbc.Progress(value=25, striped=True, color="primary", style={"width": "66.5%"}),
+            html.Br(),
             create_iframe("https://www.youtube.com/embed/stqJRtjIPrI?si=1MI5daW_ldY3aQz3"),
             html.Br(), html.Br(),
             html.P("Please watch the video. Below indicate two causal relations you recognize."),
@@ -102,6 +108,8 @@ def generate_step_content(step, session_data):
         text2 = 'Select three factors that reiforce each other'
         return html.Div([
             html.Br(), html.Br(), html.Br(),
+            dbc.Progress(value=50, striped=True, color="primary", style={"width": "66.5%"}),
+            html.Br(),
             create_iframe('https://www.youtube.com/embed/EdwiSp3BdKk?si=TcqeWxAlGl-_NUfx'),
             html.Br(), html.Br(),
             html.P("Please watch the video. Below indicate your vicious cycles. You can choose one containing two factors and another one containing three.", style={'width': '70%'}),
@@ -119,6 +127,8 @@ def generate_step_content(step, session_data):
         text = 'Select one factor'
         return html.Div([
             html.Br(), html.Br(), html.Br(),
+            dbc.Progress(value=75, striped=True, color="primary", style={"width": "66.5%"}),
+            html.Br(),
             create_iframe('https://www.youtube.com/embed/hwisVnJ0y88?si=OpCWAMaDwTThocO6'),
             html.Br(), html.Br(),
             html.P("Please watch the video. Below indicate the factor you feel is the most influential one in your mental-health map.", style={'width': '70%'}),
@@ -130,8 +140,12 @@ def generate_step_content(step, session_data):
         elements = session_data.get('elements', [])
         selected_factors = session_data['add-nodes'] or []
         options = [{'label': factor, 'value': factor} for factor in selected_factors]
-        print(elements)
         return html.Div([
+            html.Br(), html.Br(), html.Br(),
+            html.Div([
+                dbc.Progress(value=100, striped=True, color="primary", style={"width": "66.5%", "position": "relative"}),
+                html.Span("🎉", style={"font-size": "20px", "margin-left": "10px", "margin-top": "-5px"})
+            ], style={"display": "flex"}), 
             html.Div([
                 # Graph Container
                 html.Div([
@@ -142,10 +156,10 @@ def generate_step_content(step, session_data):
                         zoom=1,
                         pan={'x': 200, 'y': 200},
                         stylesheet = session_data['stylesheet'],
-                        style={'width': '90%', 'height': '480px'}
+                        style={'width': '90%', 'height': '470px'}
                     )
                 ], style={'flex': '1'}),
-                ], style={'display': 'flex', 'height': '470px', 'alignItems': 'flex-start', 'marginTop': '80px'}),
+                ], style={'display': 'flex', 'height': '470px', 'alignItems': 'flex-start', 'marginTop': '28px'}),
                 html.Br(),
                 ])
     
@@ -154,7 +168,10 @@ def generate_step_content(step, session_data):
 
 # Function: Create my-mental-health-map editing tab
 def create_mental_health_map_tab(edit_map_data, color_scheme_data, sizing_scheme_data):
-    options = [{'label': factor, 'value': factor} for factor in factors]
+    # Assuming 'edit_map_data' contains the Cytoscape elements
+    cytoscape_elements = edit_map_data.get('elements', [])
+    options_1 = [{'label': element['data'].get('label', element['data'].get('id')), 'value': element['data'].get('id')} for element in cytoscape_elements if 'data' in element and 'label' in element['data'] and 'id' in element['data']]
+    # options = [{'label': factor, 'value': factor} for factor in factors]
     color_schemes = [{'label': color, 'value': color} for color in node_color]
     sizing_schemes = [{'label': size, 'value': size} for size in node_size]
     return html.Div([
@@ -250,6 +267,13 @@ def create_mental_health_map_tab(edit_map_data, color_scheme_data, sizing_scheme
                             id='edge-edit-modal',
                             is_open=False),
 
+            # Modal for Donation info
+            dbc.Modal([dbc.ModalHeader(dbc.ModalTitle("Data Donation")),
+                       dbc.ModalBody("Here you can anonymously donate your map. Our aim is to continuously improve PsySys to provide scientifically backed content for our users. Therefore, we believe it is imporant to analyze PsySys results to better understand its clinical value and potential use. By choosing to donate your map, you agree that your anonymized data can be used for research purposes.", id = 'donation-info'),
+                       dbc.ModalFooter(
+                           dbc.Button("Yes, I want to donate", id="donation-agree", className="ms-auto", n_clicks=0))    
+                            ],id='donation-modal', is_open=False),
+
             # Editing features
             html.Div([
                 html.Div([
@@ -259,9 +283,9 @@ def create_mental_health_map_tab(edit_map_data, color_scheme_data, sizing_scheme
                 ], style={'display': 'flex', 'alignItems': 'right', 'marginBottom': '10px'}),
 
                 html.Div([
-                    dcc.Dropdown(id='edit-edge', options=options, placeholder='Enter connection', multi=True, style={'width': '96%', 'borderRadius': '10px'}),
+                    dcc.Dropdown(id='edit-edge', options=options_1, placeholder='Enter connection', multi=True, style={'width': '96%', 'borderRadius': '10px'}),
                     dbc.Button("➕", id='btn-plus-edge', color="primary", style={'marginRight': '5px'}),
-                    dbc.Button("➖", id='btn-minus-edge', color="danger")
+                    dbc.Button("➖", id='btn-minus-edge', color="danger"),
                 ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'}),
             
                 html.Div([
@@ -346,16 +370,6 @@ def add_edge(source, target, elements, existing_edges):
             return elements, existing_edges
         
 # Function: Delete an edge
-# def delete_edge(source, target, elements, existing_edges):
-#     edge_key = f"{source}->{target}"
-#     if edge_key in existing_edges:
-#         for i in range(len(elements) - 1, -1, -1):
-#             if elements[i].get('data', {}).get('source') == source and elements[i].get('data', {}).get('target') == target:
-#                 del elements[i]
-#                 break
-#         existing_edges.remove(edge_key)
-#     return elements, existing_edges
-
 def delete_edge(source, target, elements, existing_edges):
     # Remove the edge from elements
     elements[:] = [element for element in elements if not ('source' in element.get('data', {}) and element['data']['source'] == source and 'target' in element.get('data', {}) and element['data']['target'] == target)]
@@ -366,7 +380,7 @@ def delete_edge(source, target, elements, existing_edges):
 # Function: Include causal chains into the map  
 # def map_add_chains(session_data, chain1, chain2):
 #     map_elements = session_data['elements']
-#     existing_edges = set(session_data['edges'])
+#     existing_edges = setc(session_data['edges'])
 #     previous_chain1 = session_data['dropdowns']['chain1']['value'] or []
 #     previous_chain2 = session_data['dropdowns']['chain2']['value'] or []
 
@@ -558,7 +572,6 @@ def get_color(value):
 
 # Function: Calculate degree centrality
 def calculate_degree_centrality(elements, degrees):
-    print(elements)
     for element in elements:
         if 'source' in element['data']:
             source = element['data']['source']

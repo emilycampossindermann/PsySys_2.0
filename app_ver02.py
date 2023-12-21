@@ -4,6 +4,7 @@ from constants import factors, node_color, node_size
 from functions import generate_step_content, create_mental_health_map_tab, create_likert_scale, create_iframe, create_dropdown
 from functions import map_add_chains, map_add_cycles, map_add_factors, add_edge, delete_edge, graph_color, color_scheme, node_sizing
 from functions import apply_centrality_color_styles, apply_centrality_size_styles, apply_severity_color_styles, apply_severity_size_styles, apply_uniform_color_styles, apply_uniform_size_styles
+from functions import calculate_degree_centrality
 
 # Import libraries
 import dash
@@ -19,8 +20,12 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-import json
 import base64
+import json
+import io
+from PIL import Image
+from datetime import datetime
+import requests
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP,'https://use.fontawesome.com/releases/v5.8.1/css/all.css'],suppress_callback_exceptions=True)
 app.title = "PsySys"
@@ -65,7 +70,8 @@ nav_col = dbc.Col(
             [
                 dbc.NavLink("Psychoeducation", href="/", active="exact"),
                 dbc.NavLink("Edit My Map", href="/my-mental-health-map", active="exact"),
-                dbc.NavLink("Track My Map", href="/track-my-mental-health-map", active="exact")
+                dbc.NavLink("Track My Map", href="/track-my-mental-health-map", active="exact"),
+                dbc.NavLink("About Us", href="/about", active="exact"),
             ],
             vertical=True,
             pills=True,
@@ -132,7 +138,8 @@ app.layout = dbc.Container([
     dcc.Store(id='severity-scores', data={}, storage_type='session'),
     dcc.Store(id='annotation-data', data={}, storage_type='session'),
     dcc.Store(id='edge-data', data={}, storage_type='session'),
-    dcc.Download(id='download-link')
+    dcc.Download(id='download-link'),
+    html.Div(id='dummy-output', style={'display': 'none'})
 ])
 
 # Callback: Display the page & next/back button based on current step 
@@ -178,6 +185,43 @@ def update_page_and_buttons(pathname, edit_map_data, current_step_data, session_
         content = create_mental_health_map_tab(edit_map_data, color, sizing)
         back_button_style = hidden_style
         next_button_style = hidden_style
+
+    elif pathname == "/about":
+        back_button_style = hidden_style
+        next_button_style = hidden_style
+        
+        content = html.Div([
+            html.Br(), html.Br(), html.Br(),
+            html.Div([
+                html.H6("Our Mission", style={'textAlign': 'center', 'fontFamily': 'Arial, sans-serif', 'fontWeight': 'bold'}),
+                html.H3("Making mental-health more graspable for all", style={'textAlign': 'center', 'fontFamily': 'Arial, sans-serif'}),
+                html.P("Describe your mission here...", style={'textAlign': 'center', 'maxWidth': '600px', 'margin': '0 auto'}),
+                # Add more mission details as needed
+            ]),
+            html.Br(), html.Br(), html.Br(), html.Br(),
+            html.Div([
+                html.H6("Our Team", style={'textAlign': 'center', 'fontFamily': 'Arial, sans-serif', 'fontWeight': 'bold'}),
+                
+            html.Div([
+                html.Div([
+                    html.Img(src=app.get_asset_url('profile_emilycampossindermann.jpeg'), style={'width': '120px', 'height': '120px', 'borderRadius': '50%', 'marginRight': '50px'}),
+                    html.P("Emily C. Sindermann", style={'textAlign': 'center', 'marginTop': '10px', 'marginRight': '50px'})
+                ], style={'display': 'inline-block', 'margin': '10px'}),
+
+                html.Div([
+                    html.Img(src=app.get_asset_url('profile_dennyborsboom.jpeg'), style={'width': '120px', 'height': '120px', 'borderRadius': '50%', 'marginRight': '50px'}),
+                    html.P("Denny Borsboom", style={'textAlign': 'center', 'marginTop': '10px', 'marginRight': '50px'})
+                ], style={'display': 'inline-block', 'margin': '10px'}),
+
+                html.Div([
+                    html.Img(src=app.get_asset_url('profile_tessablanken.jpeg'), style={'width': '120px', 'height': '120px', 'borderRadius': '50%'}),
+                    html.P("Tessa Blanken", style={'textAlign': 'center', 'marginTop': '10px'})
+                ], style={'display': 'inline-block', 'margin': '10px'}),
+            ], style={'background-color': '#f2f2f2', 'padding': '20px', 'maxWidth': '600px', 'margin': '0 auto', 'borderRadius': '10px', 'textAlign': 'center'})
+
+            ], style={'background-color': '#f2f2f2', 'padding': '20px', 'maxWidth': '700px', 'margin': '0 auto', 'borderRadius': '10px'})
+                # You can add more sections with relevant information
+            ])
 
     elif content is None:
         content = html.Div("Page not found")
@@ -305,17 +349,113 @@ def load_session_graph(n_clicks, session_data):
     return dash.no_update      
 
 # Callback: Download graph as file
+# @app.callback(
+#     Output('download-link', 'data'),
+#     Input('download-file-btn', 'n_clicks'),
+#     State('edit-map-data', 'data'),
+#     prevent_initial_call=True
+# )
+# def generate_download(n_clicks, data):
+#     if n_clicks:
+#         # Convert the dictionary to a JSON string
+#         json_string = json.dumps(data)
+#         return dcc.send_bytes(json_string.encode('utf-8'), "my_mental_health_map.json")
+#     return dash.no_update
+
+def format_export_data(data, current_style, severity_scores, edge_data, annotations):
+    elements = data['elements']
+    # Calculate & include: degree centralities
+    degrees = {element['data']['id']: {'out': 0, 'in': 0} for element in elements if 'id' in element['data']}
+    
+    # Calculate in-degree and out-degree
+    elements, degrees = calculate_degree_centrality(elements, degrees)
+
+    # Compute centrality based on the selected type
+    out_degrees = {}
+    in_degrees = {}
+    out_in_ratio = {}
+    for id, degree_counts in degrees.items():
+        out_degrees[id] = degree_counts['out']
+        in_degrees[id] = degree_counts['in']
+
+        if degree_counts['in'] != 0:
+            out_in_ratio[id] = degree_counts['out'] / degree_counts['in']
+        else:
+            out_in_ratio[id] = 0 
+
+    # Format data to be exported 
+    # Filter out: elements, stylesheet, edges
+    # Include: annotations, severity scores, edge_data, degree centralities
+    exported_data = {
+        'elements': data['elements'],
+        'stylesheet': current_style,
+        'edges': data['edges'],
+        'severity-scores': severity_scores,
+        'edge-data': edge_data,
+        'out-degrees': out_degrees,
+        'in-degrees': in_degrees,
+        'out-in-ratio': out_in_ratio,
+        'annotations': annotations
+    }
+    return exported_data
+    
 @app.callback(
     Output('download-link', 'data'),
     Input('download-file-btn', 'n_clicks'),
-    State('edit-map-data', 'data'),
+    [State('edit-map-data', 'data'),
+     State('severity-scores', 'data'),
+     State('annotation-data', 'data'),
+     State('edge-data', 'data'),
+     State('my-mental-health-map', 'stylesheet')],
     prevent_initial_call=True
 )
-def generate_download(n_clicks, data):
+def generate_download(n_clicks, data, severity_scores, annotations, edge_data, current_style):
     if n_clicks:
+        elements = data['elements']
+        # Calculate & include: degree centralities
+        degrees = {element['data']['id']: {'out': 0, 'in': 0} for element in elements 
+               if 'id' in element['data']}
+    
+        # Calculate in-degree and out-degree
+        elements, degrees = calculate_degree_centrality(elements, degrees)
+
+        # Compute centrality based on the selected type
+        out_degrees = {}
+        in_degrees = {}
+        out_in_ratio = {}
+        for id, degree_counts in degrees.items():
+            out_degrees[id] = degree_counts['out']
+            in_degrees[id] = degree_counts['in']
+
+            if degree_counts['in'] != 0:
+                out_in_ratio[id] = degree_counts['out'] / degree_counts['in']
+            else:
+                out_in_ratio[id] = 0 
+
+        # Format data to be exported 
+        # Filter out: elements, stylesheet, edges
+        # Include: annotations, severity scores, edge_data, degree centralities
+        exported_data = {
+            'elements': data['elements'],
+            'stylesheet': current_style,
+            'edges': data['edges'],
+            'severity-scores': severity_scores,
+            'edge-data': edge_data,
+            'out-degrees': out_degrees,
+            'in-degrees': in_degrees,
+            'out-in-ratio': out_in_ratio,
+            'annotations': annotations
+        }
+
+        # Get the current date and time
+        current_date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+        # Append the date to the file name
+        file_name = f"my_mental_health_map_{current_date}.json"
+
         # Convert the dictionary to a JSON string
-        json_string = json.dumps(data)
-        return dcc.send_bytes(json_string.encode('utf-8'), "my_mental_health_map.json")
+        json_string = json.dumps(exported_data)
+        return dcc.send_bytes(json_string.encode('utf-8'), file_name)
     return dash.no_update
 
 # Callback: Upload existing map file
@@ -356,7 +496,7 @@ def open_node_edit_modal(tapNodeData, switch, severity_scores, annotations):
         return True, node_name, severity_score, annotation
     return False, None, None, ''
 
-# Reset tabnodedata on mode switch
+# Callback: Reset tabnodedata on mode switch
 @app.callback(
     Output('my-mental-health-map', 'tapNodeData'),  # Assuming 'tabNode' is the component storing the node data
     Input('inspect-switch', 'value'),  # Assuming 'mode-switch' keeps track of the current mode
@@ -395,18 +535,14 @@ def update_annotations(note_input, tapNodeData, annotations):
 def save_node_changes(n_clicks, new_name, new_severity, elements, severity_scores, edit_map_data, tapNodeData):
     if n_clicks and tapNodeData:
         old_node_id = tapNodeData['id']
-        old_node_name = tapNodeData.get('label', old_node_id)  # Assuming label is stored in tapNodeData
 
         # Update node name in elements
         for element in elements:
             if element.get('data', {}).get('id') == old_node_id:
                 element['data']['label'] = new_name
 
-        # Update node name in severity_scores if it's changed
-        if old_node_name != new_name:
-            severity_scores[new_name] = severity_scores.pop(old_node_name, new_severity)
-
         # Update severity score
+        severity_scores[old_node_id] = new_severity
         severity_scores[new_name] = new_severity
 
         # Update edit_map_data with the changed elements
@@ -415,7 +551,7 @@ def save_node_changes(n_clicks, new_name, new_severity, elements, severity_score
         return elements, severity_scores, edit_map_data
     return dash.no_update
 
-# Callback to open the modal
+# Callback: Open edge edit modal
 @app.callback(
     [Output('edge-edit-modal', 'is_open'),
      Output('edge-explanation', 'children'),
@@ -423,8 +559,7 @@ def save_node_changes(n_clicks, new_name, new_severity, elements, severity_score
      Output('edge-annotation', 'value')],
     [Input('my-mental-health-map', 'tapEdgeData'),
      Input('inspect-switch', 'value')],
-    State('edge-data', 'data'),
-    prevent_initial_call=True
+    State('edge-data', 'data')
 )
 def open_edge_edit_modal(tapEdgeData, switch, edge_data):
     if edge_data is None:
@@ -462,7 +597,7 @@ def update_edge_data_and_close_modal(save_clicks, tapEdgeData, switch, strength,
     # Ensure edge_data and edit_map_data['stylesheet'] are initialized
     if edge_data is None:
         edge_data = {}
-    #stylesheet = edit_map_data.get('stylesheet', []) if edit_map_data else []
+
     stylesheet=current
 
     if triggered_id == 'edge-save-btn' and tapEdgeData:
@@ -482,7 +617,7 @@ def update_edge_data_and_close_modal(save_clicks, tapEdgeData, switch, strength,
         # Create a new stylesheet with updated style for the tapped edge
         new_stylesheet = [rule for rule in stylesheet if rule['selector'] != f'edge[id="{edge_id}"]']
         new_stylesheet.append(tapped_edge_style)
-
+        
         return edge_data, False, new_stylesheet  # Close the modal and update stylesheet
 
     if triggered_id == 'my-mental-health-map' and 0 not in switch and tapEdgeData:
@@ -492,6 +627,46 @@ def update_edge_data_and_close_modal(save_clicks, tapEdgeData, switch, strength,
         return edge_data, True, stylesheet  # Open the modal without updating stylesheet
 
     return edge_data, is_open, stylesheet  # Default return
+
+# Callback: Update edit_map_data stylesheet after altering edge connections
+# @app.callback(
+#     Output('edit-map-data', 'data', allow_duplicate=True),
+#     [
+#         Input('edge-data', 'data')
+#     ],
+#     [
+#         State('edit-map-data', 'data')
+#     ],
+#     prevent_initial_call=True
+# )
+# def update_stylesheet_in_edit_map(edge_data, edit_map_data):
+#     if edge_data and edit_map_data:
+#         updated_stylesheet = generate_updated_stylesheet(edge_data, edit_map_data['stylesheet'])
+#         if updated_stylesheet != edit_map_data['stylesheet']:  # Only update if there's a change
+#             edit_map_data['stylesheet'] = updated_stylesheet
+#             return edit_map_data
+#     return dash.no_update
+
+# def generate_updated_stylesheet(edge_data, current_stylesheet):
+#     # Logic to update the stylesheet based on edge_data changes
+#     updated_stylesheet = current_stylesheet.copy()
+
+#     for edge_id, data in edge_data.items():
+#         strength = data.get('strength', 5)
+#         opacity = strength / 5
+
+#         # Update the style for the edge in the stylesheet
+#         tapped_edge_style = {
+#             'selector': f'edge[id="{edge_id}"]',
+#             'style': {'opacity': opacity}
+#         }
+
+#         # Update or add the new style for the edge
+#         updated_stylesheet = [rule for rule in updated_stylesheet if rule['selector'] != f'edge[id="{edge_id}"]']
+#         updated_stylesheet.append(tapped_edge_style)
+
+#     return updated_stylesheet
+
 
 # Callback: Edit map - add node
 @app.callback(
@@ -517,7 +692,10 @@ def map_add_node(n_clicks, node_name, elements, edit_map_data, severity_scores):
     edit_map_data['add-nodes'] = node_names
     edit_map_data['elements'] = elements
 
-    return elements, node_names, edit_map_data, severity_scores
+    cytoscape_elements = edit_map_data.get('elements', [])
+    options_1 = [{'label': element['data'].get('label', element['data'].get('id')), 'value': element['data'].get('id')} for element in cytoscape_elements if 'data' in element and 'label' in element['data'] and 'id' in element['data']]
+    
+    return elements, options_1, edit_map_data, severity_scores
 
 # Callback: Remove existing node from graph
 @app.callback(
@@ -546,8 +724,10 @@ def delete_node(n_clicks, node_id, elements, edit_map_data, severity_scores):
     edit_map_data['add-nodes'] = node_names
     edit_map_data['elements'] = elements
 
-    print(severity_scores)
-    return elements, node_names, edit_map_data, severity_scores
+    cytoscape_elements = edit_map_data.get('elements', [])
+    options_1 = [{'label': element['data'].get('label', element['data'].get('id')), 'value': element['data'].get('id')} for element in cytoscape_elements if 'data' in element and 'label' in element['data'] and 'id' in element['data']]
+
+    return elements, options_1, edit_map_data, severity_scores
 
 # Callback: Limit dropdown for edit-edge to 2
 @app.callback(
@@ -560,24 +740,6 @@ def limit_dropdown_edit_edge(edit_edge):
     return edit_edge
 
 # Callback: Add additional edge to graph
-# @app.callback(
-#     [Output('my-mental-health-map', 'elements', allow_duplicate=True),
-#      Output('edit-map-data', 'data', allow_duplicate=True)],
-#     [Input('btn-plus-edge', 'n_clicks')],
-#     [State('edit-edge', 'value'),
-#      State('my-mental-health-map', 'elements'),
-#      State('edit-map-data', 'data')],
-#      prevent_initial_call=True
-# )
-# def add_edge_output(n_clicks, new_edge, elements, edit_map_data):
-#     if n_clicks and new_edge and len(new_edge) == 2:
-#         source = new_edge[0]
-#         target = new_edge[1]
-#         existing_edges = set(edit_map_data['edges'])
-#         add_edge(source, target, elements, existing_edges)
-#         edit_map_data['edges'] = list(existing_edges)
-#         edit_map_data['elements'] = elements
-#     return elements, edit_map_data
 @app.callback(
     [Output('my-mental-health-map', 'elements', allow_duplicate=True),
      Output('edit-map-data', 'data', allow_duplicate=True)],
@@ -602,25 +764,6 @@ def add_edge_output(n_clicks, new_edge, elements, edit_map_data):
 
 
 # Callback: Delete existing edge from graph
-# @app.callback(
-#     [Output('my-mental-health-map', 'elements', allow_duplicate=True),
-#      Output('edit-map-data', 'data', allow_duplicate=True)],
-#     [Input('btn-minus-edge', 'n_clicks')],
-#     [State('edit-edge', 'value'),
-#      State('my-mental-health-map', 'elements'),
-#      State('edit-map-data', 'data')],
-#      prevent_initial_call=True
-# )
-# def delete_edge_output(n_clicks, edge, elements, edit_map_data):
-#     if n_clicks and edge and len(edge) == 2:
-#         source = edge[0]
-#         target = edge[1]
-#         existing_edges = set(edit_map_data['edges'])
-#         delete_edge(source, target, elements, existing_edges)
-#         edit_map_data['edges'] = list(existing_edges)
-#         edit_map_data['elements'] = elements
-#     return elements, edit_map_data
-
 @app.callback(
     [Output('my-mental-health-map', 'elements', allow_duplicate=True),
      Output('edit-map-data', 'data', allow_duplicate=True)],
@@ -683,7 +826,6 @@ def set_node_sizes(selected_scheme, stylesheet, edit_map_data, severity_scores):
             stylesheet = edit_map_data['stylesheet']
         else:
             stylesheet = []  # or some default stylesheet
-
         return stylesheet, edit_map_data
     else:
         return dash.no_update
@@ -704,46 +846,6 @@ def update_likert_scales(selected_factors, severity_scores):
     return [create_likert_scale(factor, severity_scores.get(factor, 0)) for factor in selected_factors]
 
 # Callback: Update severity scores
-# @app.callback(
-#     Output('severity-scores', 'data'),
-#     [Input({'type': 'likert-scale', 'factor': ALL}, 'value')],
-#     State('session-data', 'data')
-# )
-# def update_severity_scores(severity_values, session_data):
-#     severity_scores = {}
-#     factors = session_data['dropdowns']['initial-selection']['value']
-#     if factors and len(severity_values) != 0:
-#         severity_scores = {factor: value for factor, value in zip(factors, severity_values)}
-#     else:
-#         return dash.no_update
-#     return severity_scores
-
-# Callback: Update severity scores
-# @app.callback(
-#     Output('severity-scores', 'data'),
-#     [Input({'type': 'likert-scale', 'factor': ALL}, 'value')],
-#     [State('session-data', 'data'),
-#      State('severity-scores', 'data')]
-# )
-# def update_severity_scores(severity_values, session_data, existing_severity_scores):
-#     # Initialize severity scores if not present
-#     if existing_severity_scores is None:
-#         existing_severity_scores = {}
-
-#     # Get the current list of factors
-#     current_factors = session_data['dropdowns']['initial-selection']['value']
-
-#     # Update the existing severity scores with new values
-#     for factor, value in zip(current_factors, severity_values):
-#         existing_severity_scores[factor] = value
-
-#     # Remove severity scores for factors that are no longer present
-#     factors_to_remove = set(existing_severity_scores.keys()) - set(current_factors)
-#     for factor in factors_to_remove:
-#         existing_severity_scores.pop(factor, None)
-
-#     return existing_severity_scores
-
 @app.callback(
     Output('severity-scores', 'data'),
     [Input({'type': 'likert-scale', 'factor': ALL}, 'value')],
@@ -836,7 +938,7 @@ def update_stylesheet(tapNodeData, switch, edit_map_data):
     # Return default if no node is clicked or if mode is not 'inspect'
     return default_stylesheet
 
-# Information
+# Callback: Open inspect info modal 
 @app.callback(
     Output('modal-inspect', 'is_open'),
     [Input('help-inspect', 'n_clicks')],
@@ -847,6 +949,7 @@ def inspect_info(n_clicks, is_open):
         return not is_open
     return is_open
 
+# Callback: Open color info modal 
 @app.callback(
     Output('modal-color-scheme', 'is_open'),
     [Input('help-color', 'n_clicks')],
@@ -857,6 +960,7 @@ def toggle_modal_color(n_clicks, is_open):
         return not is_open
     return is_open
 
+# Callback: Populate color info modal
 @app.callback(
     Output('modal-color-scheme-body', 'children'),
     [Input('color-scheme', 'value')]
@@ -876,6 +980,7 @@ def update_modal_content_color(selected_scheme):
         return 'The factors in your map are colored based on their out-/in-degree ratio, which is calculated by dividing the number of out-going by the number of incoming connections. The darkest factor has many out-going and few incoming connections (active), and the lightest factor has few out-going and many incoming connections (passive).'
     return 'As a default the factors in your map are uniformly colored.'
 
+# Callback: Open sizing info modal 
 @app.callback(
     Output('modal-sizing-scheme', 'is_open'),
     [Input('help-size', 'n_clicks')],
@@ -886,6 +991,7 @@ def toggle_modal_sizing(n_clicks, is_open):
         return not is_open
     return is_open
 
+# Callback: Populate sizing info modal 
 @app.callback(
     Output('modal-sizing-scheme-body', 'children'),
     [Input('sizing-scheme', 'value')]
@@ -905,10 +1011,103 @@ def update_modal_content_sizing(selected_scheme):
         return 'The size of the factors in your map corresponds to their out-/in-degree ratio, which is calculated by dividing the number of out-going by the number of incoming connections. The largest factor has many out-going and few incoming connections (active), and the smallest factor has few out-going and many incoming connections (passive).'
     return 'As a default the size of the factors in your map corresponds to their relative severity. The largest factor has the highest indicated severity and the smallest factor has lowest indicated severity.'
 
-# INLCUDE MAP IN HOME TAB (**)
-# PROGRESS BAR
-# Callback: Download network as image ***
-# edges gone ***
+# Callback: Download network as image
+@app.callback(
+    Output('my-mental-health-map', 'generateImage'),
+    Input('download-image-btn', 'n_clicks'),
+    )
+def get_image(n_clicks):
+    # File type to output of 'svg, 'png', 'jpg', or 'jpeg' (alias of 'jpg')
+    ftype = 'jpg'
+
+    # 'store': Stores the image data in 'imageData' !only jpg/png are supported
+    # 'download'`: Downloads the image as a file with all data handling
+    # 'both'`: Stores image data and downloads image as file.
+    action = 'store'
+
+    file_name = 'my_image'  # Default file name
+
+    if n_clicks:
+        action = 'download'
+        current_date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        file_name = f"my_mental_health_map_snapshot_{current_date}.{ftype}"
+
+    return {
+        'type': ftype,
+        'action': action,
+        'filename': file_name  # Set the filename for download
+    }
+
+# Callback: Update mental-health-map stylesheet when edge-data is updated
+def send_to_github(data):
+    # Replace with your own GitHub repository details
+    repo_owner = 'emilycampossindermann'
+    repo_name = 'PsySys_2.0'
+    current_date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    file_path = f"data-donation/graph_{current_date}.json"
+    access_token = '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'  # Use a secret for production
+    
+    url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{file_path}'
+    headers = {'Authorization': f'token {access_token}'}
+
+    # Encode data to be sent as base64
+    # content = json.dumps(data).encode('utf-8').hex()
+
+    # payload = {
+    #     'message': 'Update graph data',
+    #     'content': content
+    # }
+
+    # # Make a PUT request to update the file in the repository
+    # response = requests.put(url, headers=headers, json=payload)
+
+    # Encode data to be sent as Base64
+    content = json.dumps(data).encode('utf-8')
+    encoded_content = base64.b64encode(content).decode('utf-8')
+
+    payload = {
+        'message': 'Graph donation',
+        'content': encoded_content
+    }
+
+    # Make a PUT request to update the file in the repository
+    response = requests.put(url, headers=headers, json=payload)
+
+    if response.status_code == 200:
+        print('Data sent to GitHub successfully')
+    else:
+        print('Failed to send data to GitHub')
+        print(response.text)
+
+# Callback: Donation 
+@app.callback(
+    Output('donation-modal', 'is_open'),
+    [Input('donate-btn', 'n_clicks')],
+    [State('donation-modal', 'is_open')],
+)
+def donation_modal(n_clicks, is_open):
+    if n_clicks:
+        return not is_open
+    return is_open
+
+@app.callback(
+    Output('dummy-output', 'children'),
+    Input('donation-agree', 'n_clicks'),
+    [State('edit-map-data', 'data'),
+     State('my-mental-health-map', 'stylesheet'),
+     State('severity-scores', 'data'),
+     State('edge-data', 'data'),
+     State('annotation-data', 'data')]
+)
+def donate_button_clicked(n_clicks, data, current_style, severity_scores, edge_data, annotations):
+    if n_clicks:
+        graph_data = format_export_data(data, current_style, severity_scores, edge_data, annotations)
+        send_to_github(graph_data)
+        return 'Thank you for your donation! Data sent to GitHub.'
+
+    return 'Donate to send data to GitHub'
+
+# Callback: Network comparison
 
 if __name__ == '__main__':
     app.run_server(debug=True, port=8069)
