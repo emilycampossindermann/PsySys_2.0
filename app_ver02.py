@@ -26,6 +26,7 @@ import io
 from PIL import Image
 from datetime import datetime
 import requests
+import re
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP,'https://use.fontawesome.com/releases/v5.8.1/css/all.css'],suppress_callback_exceptions=True)
 app.title = "PsySys"
@@ -64,7 +65,7 @@ buttons_map = html.Div(
 nav_col = dbc.Col(
     [
         html.Br(),
-        html.H2("PsySys"),
+        html.H2("PsySys", style={"marginLeft":"15px"}),
         html.Hr(),
         dbc.Nav(
             [
@@ -138,6 +139,7 @@ app.layout = dbc.Container([
     dcc.Store(id='severity-scores', data={}, storage_type='session'),
     dcc.Store(id='annotation-data', data={}, storage_type='session'),
     dcc.Store(id='edge-data', data={}, storage_type='session'),
+    dcc.Store(id='comparison', data={}, storage_type='session'),
     dcc.Download(id='download-link'),
     html.Div(id='dummy-output', style={'display': 'none'})
 ])
@@ -186,6 +188,40 @@ def update_page_and_buttons(pathname, edit_map_data, current_step_data, session_
         back_button_style = hidden_style
         next_button_style = hidden_style
 
+    elif pathname == "/track-my-mental-health-map":
+        back_button_style = hidden_style
+        next_button_style = hidden_style
+
+        # Logic to create basic tab layout
+        # Dummy variable for graph
+        content = html.Div([
+        html.Br(), html.Br(), html.Br(),
+        html.Div([cyto.Cytoscape(id='track-graph',
+                                 elements=session_data['elements'],
+                                 layout={'name': 'cose', 'fit': True, 'padding': 10},
+                                 zoom=1,
+                                 pan={'x': 200, 'y': 200},
+                                 stylesheet = session_data['stylesheet'],
+                                 style={'width': '90%', 'height': '470px'})
+                    ], style={'flex': '1'}),
+        
+        html.Br(),
+        # Dummy variable for timeline slider
+        dcc.Slider(id='timeline-slider',
+                   marks={0: 'Current'},
+                   min=0,
+                   max=0,
+                   value=0,
+                   step=None),
+
+        html.Br(),
+
+        dcc.Upload(id='upload-graph-tracking',
+                   children=dbc.Button("Upload Map", id='upload-map-btn'),
+                   style={'display': 'inline-block'})
+
+        ])
+
     elif pathname == "/about":
         back_button_style = hidden_style
         next_button_style = hidden_style
@@ -193,33 +229,46 @@ def update_page_and_buttons(pathname, edit_map_data, current_step_data, session_
         content = html.Div([
             html.Br(), html.Br(), html.Br(),
             html.Div([
-                html.H6("Our Mission", style={'textAlign': 'center', 'fontFamily': 'Arial, sans-serif', 'fontWeight': 'bold'}),
-                html.H3("Making mental-health more graspable for all", style={'textAlign': 'center', 'fontFamily': 'Arial, sans-serif'}),
-                html.P("Describe your mission here...", style={'textAlign': 'center', 'maxWidth': '600px', 'margin': '0 auto'}),
+                #html.H6("Our Mission", style={'textAlign': 'center', 'fontFamily': 'Arial, sans-serif', 'fontWeight': 'bold'}),
+                #html.H3("Making mental-health more graspable for all", style={'textAlign': 'center', 'fontFamily': 'Arial, sans-serif'}),
+                #html.P("Describe your mission here...", style={'textAlign': 'center', 'maxWidth': '600px', 'margin': '0 auto'}),
+                html.H2("Making mental-health", style={'fontFamily': 'Courier New', 'marginLeft': '40px', 'fontWeight': 'bold'}),
+                html.H2("more graspable", style={'fontFamily': 'Courier New', 'marginLeft': '40px', 'fontWeight': 'bold'}),
+                html.H2("for all", style={'fontFamily': 'Courier New', 'marginLeft': '40px', 'fontWeight': 'bold'}),
+                html.Br(),
+                html.P("With PsySys our goal is to convey the concepts of the network approach to psychopathology directly to users. Thereby, we want to provide users with tools to better understand the dynamics underlying their mental distress. The educational content was created and evaluated within the Psychology Research Master Thesis by Emily Campos Sindermann at the University of Amsterdam (UvA). Since then, we have continued to develop PsySys as a stand-alone application to further investigate its potential clinical utility. We would also like to thank Dr. Lars Klintwal (Karolinska Institute) and Dr. Julian Burger (Yale University) for their active contribution in the creation of PsySys.", 
+                       style={'maxWidth': '900px', 'marginLeft': '40px', 'color':'grey'}),
+                html.Hr(style={'maxWidth': '900px', 'marginLeft': '40px'}),
                 # Add more mission details as needed
             ]),
-            html.Br(), html.Br(), html.Br(), html.Br(),
+            #html.Br(), html.Br(), html.Br(), html.Br(),
             html.Div([
-                html.H6("Our Team", style={'textAlign': 'center', 'fontFamily': 'Arial, sans-serif', 'fontWeight': 'bold'}),
+                #html.H6("Our Team", style={'textAlign': 'center', 'fontFamily': 'Arial, sans-serif', 'fontWeight': 'bold'}),
                 
             html.Div([
                 html.Div([
-                    html.Img(src=app.get_asset_url('profile_emilycampossindermann.jpeg'), style={'width': '120px', 'height': '120px', 'borderRadius': '50%', 'marginRight': '50px'}),
-                    html.P("Emily C. Sindermann", style={'textAlign': 'center', 'marginTop': '10px', 'marginRight': '50px'})
+                    html.Img(src=app.get_asset_url('profile_emilycampossindermann.jpeg'), style={'width': '160px', 'height': '160px', 'borderRadius': '50%', 'marginRight': '70px'}),
+                    html.P("Emily Campos Sindermann", style={'textAlign': 'center', 'marginTop': '10px', 'marginRight': '70px'}),
+                    html.P("Research Assistant (MSc)", style={'marginTop': '-15px', 'marginRight': '70px', 'fontStyle': 'italic'}),
+                    html.P("Developer", style={'marginTop': '-15px', 'color': 'grey', 'marginRight': '70px', 'fontStyle': 'italic'}),
                 ], style={'display': 'inline-block', 'margin': '10px'}),
 
                 html.Div([
-                    html.Img(src=app.get_asset_url('profile_dennyborsboom.jpeg'), style={'width': '120px', 'height': '120px', 'borderRadius': '50%', 'marginRight': '50px'}),
-                    html.P("Denny Borsboom", style={'textAlign': 'center', 'marginTop': '10px', 'marginRight': '50px'})
+                    html.Img(src=app.get_asset_url('profile_dennyborsboom.jpeg'), style={'width': '160px', 'height': '160px', 'borderRadius': '50%', 'marginRight': '70px'}),
+                    html.P("Denny Borsboom", style={'textAlign': 'center', 'marginTop': '10px', 'marginRight': '70px'}),
+                    html.P("Professor at UvA", style={'marginTop': '-15px', 'marginRight': '70px', 'fontStyle': 'italic'}),
+                    html.P("1st Supervisor", style={'marginTop': '-15px', 'color': 'grey', 'marginRight': '70px', 'fontStyle': 'italic'}),
                 ], style={'display': 'inline-block', 'margin': '10px'}),
 
                 html.Div([
-                    html.Img(src=app.get_asset_url('profile_tessablanken.jpeg'), style={'width': '120px', 'height': '120px', 'borderRadius': '50%'}),
-                    html.P("Tessa Blanken", style={'textAlign': 'center', 'marginTop': '10px'})
+                    html.Img(src=app.get_asset_url('profile_tessablanken.jpeg'), style={'width': '160px', 'height': '160px', 'borderRadius': '50%'}),
+                    html.P("Tessa Blanken", style={'textAlign': 'center', 'marginTop': '10px'}),
+                    html.P("Assistant Professor at UvA", style={'marginTop': '-15px', 'fontStyle': 'italic'}),
+                    html.P("2nd Supervisor", style={'marginTop': '-15px', 'color': 'grey', 'fontStyle': 'italic'}),
                 ], style={'display': 'inline-block', 'margin': '10px'}),
-            ], style={'background-color': '#f2f2f2', 'padding': '20px', 'maxWidth': '600px', 'margin': '0 auto', 'borderRadius': '10px', 'textAlign': 'center'})
+            ], style={'padding': '20px', 'maxWidth': '900px', 'margin': '0 auto', 'borderRadius': '10px', 'textAlign': 'center'})
 
-            ], style={'background-color': '#f2f2f2', 'padding': '20px', 'maxWidth': '700px', 'margin': '0 auto', 'borderRadius': '10px'})
+            ])#, style={'background-color': '#f2f2f2', 'padding': '20px', 'maxWidth': '700px', 'margin': '0 auto', 'borderRadius': '10px'})
                 # You can add more sections with relevant information
             ])
 
@@ -383,6 +432,8 @@ def format_export_data(data, current_style, severity_scores, edge_data, annotati
         else:
             out_in_ratio[id] = 0 
 
+    current_date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
     # Format data to be exported 
     # Filter out: elements, stylesheet, edges
     # Include: annotations, severity scores, edge_data, degree centralities
@@ -395,7 +446,8 @@ def format_export_data(data, current_style, severity_scores, edge_data, annotati
         'out-degrees': out_degrees,
         'in-degrees': in_degrees,
         'out-in-ratio': out_in_ratio,
-        'annotations': annotations
+        'annotations': annotations,
+        'date': current_date
     }
     return exported_data
     
@@ -412,6 +464,7 @@ def format_export_data(data, current_style, severity_scores, edge_data, annotati
 def generate_download(n_clicks, data, severity_scores, annotations, edge_data, current_style):
     if n_clicks:
         elements = data['elements']
+        current_date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         # Calculate & include: degree centralities
         degrees = {element['data']['id']: {'out': 0, 'in': 0} for element in elements 
                if 'id' in element['data']}
@@ -444,11 +497,9 @@ def generate_download(n_clicks, data, severity_scores, annotations, edge_data, c
             'out-degrees': out_degrees,
             'in-degrees': in_degrees,
             'out-in-ratio': out_in_ratio,
-            'annotations': annotations
+            'annotations': annotations,
+            'date': current_date
         }
-
-        # Get the current date and time
-        current_date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
         # Append the date to the file name
         file_name = f"my_mental_health_map_{current_date}.json"
@@ -1107,7 +1158,90 @@ def donate_button_clicked(n_clicks, data, current_style, severity_scores, edge_d
 
     return 'Donate to send data to GitHub'
 
-# Callback: Network comparison
+# Callback: Network comparison file upload
+# Extract date & time
+# If not already in marks: add date + time as key in marks
+# Augment max=1
+# Change value to current (position of current in marks)
+# Jump to this timepoint and display the new graph (feed into dummy cytoscape)
+@app.callback(
+    [Output('timeline-slider', 'marks'), # timeline structure
+     Output('timeline-slider', 'max'), # timeline current value
+     Output('timeline-slider', 'value'),
+     Output('track-graph', 'elements'),
+     Output('comparison', 'data')], # cytoscape dummy
+    Input('upload-graph-tracking', 'contents'), # upload new file
+    [State('timeline-slider', 'marks'), # timeline structure
+     State('timeline-slider', 'max'), # timeline value
+     State('timeline-slider', 'value'),
+     State('track-graph', 'elements'),
+     State('comparison', 'data')]
+)
+def upload_tracking_graph(contents, existing_marks, current_max, current_value, graph_data, map_store):
+    new_elements = graph_data
+    if contents:
+        
+        # content_type, content_string = contents.split(',')[1]  # Splitting to extract the base64 content
+        # decoded = base64.b64decode(content_string)
+        # data = json.loads(decoded.decode('utf-8'))  # Assuming JSON file, adjust as needed
+
+        # # Extract date and time from the filename
+        # filename = content_type.split(';')[1].split('=')[1]  # Replace 'filename' with the correct key
+        # match = re.search(r"(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})", filename)
+
+        content_type, content_string = contents.split(',')
+        decoded = base64.b64decode(content_string)
+        data = json.loads(decoded.decode('utf-8'))  # Assuming JSON file, adjust as needed
+        new_elements = data.get('elements', [])
+        # Extract filename from the contents object
+        filename = data['date']
+        match = re.search(r"(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})", filename)
+        
+        if match:
+            date_time = match.group(1)
+            
+            # Update marks if date/time not already in the timeline
+            if date_time not in existing_marks.values():
+                max_val = current_max + 1
+                existing_marks[max_val] = date_time
+                
+                # Set the timeline slider to the new date/time position
+                current_value = max_val
+
+                # Add to map_store
+                map_store[filename] = {}
+                map_store[filename]['elements'] = new_elements
+
+        return existing_marks, current_value, current_value, new_elements, map_store
+
+    return existing_marks, current_max, current_value, new_elements, map_store
+
+# Callback: Network comparison timeline navigation
+# When user navigates across timeline
+# Select file in dict that correspond to chosen date + time
+# Feed in this file into dummy cytoscape 
+@app.callback(
+    Output('track-graph', 'elements', allow_duplicate=True),
+    Input('timeline-slider', 'value'),
+    State('timeline-slider', 'marks'),
+    State('comparison', 'data'),
+    prevent_initial_call=True
+)
+def update_cytoscape_elements(selected_value, marks, comparison_data):
+    selected_date = None
+    
+    if comparison_data is not None:
+        label = marks.get(str(selected_value))  # Fetch label based on the slider's value
+
+        if label in comparison_data:  # Check if the label exists in comparison_data keys
+            selected_date = label
+
+        if selected_date is not None:
+            return comparison_data[selected_date]['elements']
+
+    # Return default elements or handle the case where selected_date is None
+    return []
+
 
 if __name__ == '__main__':
     app.run_server(debug=True, port=8069)
