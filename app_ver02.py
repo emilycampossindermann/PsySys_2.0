@@ -1,9 +1,8 @@
 # Current Version mental-health map tab
 
 from constants import factors, node_color, node_size
-from functions import generate_step_content, create_mental_health_map_tab, create_likert_scale, create_iframe, create_dropdown
+from functions import generate_step_content, create_mental_health_map_tab, create_likert_scale
 from functions import map_add_chains, map_add_cycles, map_add_factors, add_edge, delete_edge, graph_color, color_scheme, node_sizing
-from functions import apply_centrality_color_styles, apply_centrality_size_styles, apply_severity_color_styles, apply_severity_size_styles, apply_uniform_color_styles, apply_uniform_size_styles
 from functions import calculate_degree_centrality
 
 # Import libraries
@@ -204,17 +203,6 @@ def update_page_and_buttons(pathname, edit_map_data, current_step_data, session_
         back_button_style = hidden_style
         next_button_style = hidden_style
 
-        # Logic to create basic tab layout
-        # Dummy variable for graph
-
-        # if not track_data:
-        #     track_data['elements'] = session_data['elements']
-        #     track_data['stylesheet'] = session_data['stylesheet']
-        #     track_data['timeline-marks'] = {0: 'Current'}
-        #     track_data['timeline-min'] = 0
-        #     track_data['timeline-max'] = 0
-        #     track_data['timeline-value'] = 0
-
         map_store['Current'] = {}
         map_store['Current']['elements'] = track_data['elements']
 
@@ -264,7 +252,7 @@ def update_page_and_buttons(pathname, edit_map_data, current_step_data, session_
             html.Div([
             html.Div([
                 html.Div([
-                    html.Img(src=app.get_asset_url('profile_emilycampossindermann.jpeg'), style={'width': '160px', 'height': '160px', 'borderRadius': '50%', 'marginRight': '70px'}),
+                    html.Img(src=app.get_asset_url('DSC_4984.JPG'), style={'width': '160px', 'height': '160px', 'borderRadius': '50%', 'marginRight': '70px'}),
                     html.P("Emily Campos Sindermann", style={'textAlign': 'center', 'marginTop': '10px', 'marginRight': '70px'}),
                     html.P("Research Assistant (MSc)", style={'marginTop': '-15px', 'marginRight': '70px', 'fontStyle': 'italic'}),
                     html.P("Developer", style={'marginTop': '-15px', 'color': 'grey', 'marginRight': '70px', 'fontStyle': 'italic'}),
@@ -681,46 +669,6 @@ def update_edge_data_and_close_modal(save_clicks, tapEdgeData, switch, strength,
 
     return edge_data, is_open, stylesheet  # Default return
 
-# Callback: Update edit_map_data stylesheet after altering edge connections
-# @app.callback(
-#     Output('edit-map-data', 'data', allow_duplicate=True),
-#     [
-#         Input('edge-data', 'data')
-#     ],
-#     [
-#         State('edit-map-data', 'data')
-#     ],
-#     prevent_initial_call=True
-# )
-# def update_stylesheet_in_edit_map(edge_data, edit_map_data):
-#     if edge_data and edit_map_data:
-#         updated_stylesheet = generate_updated_stylesheet(edge_data, edit_map_data['stylesheet'])
-#         if updated_stylesheet != edit_map_data['stylesheet']:  # Only update if there's a change
-#             edit_map_data['stylesheet'] = updated_stylesheet
-#             return edit_map_data
-#     return dash.no_update
-
-# def generate_updated_stylesheet(edge_data, current_stylesheet):
-#     # Logic to update the stylesheet based on edge_data changes
-#     updated_stylesheet = current_stylesheet.copy()
-
-#     for edge_id, data in edge_data.items():
-#         strength = data.get('strength', 5)
-#         opacity = strength / 5
-
-#         # Update the style for the edge in the stylesheet
-#         tapped_edge_style = {
-#             'selector': f'edge[id="{edge_id}"]',
-#             'style': {'opacity': opacity}
-#         }
-
-#         # Update or add the new style for the edge
-#         updated_stylesheet = [rule for rule in updated_stylesheet if rule['selector'] != f'edge[id="{edge_id}"]']
-#         updated_stylesheet.append(tapped_edge_style)
-
-#     return updated_stylesheet
-
-
 # Callback: Edit map - add node
 @app.callback(
     [Output('my-mental-health-map', 'elements'),
@@ -1103,17 +1051,6 @@ def send_to_github(data):
     url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{file_path}'
     headers = {'Authorization': f'token {access_token}'}
 
-    # Encode data to be sent as base64
-    # content = json.dumps(data).encode('utf-8').hex()
-
-    # payload = {
-    #     'message': 'Update graph data',
-    #     'content': content
-    # }
-
-    # # Make a PUT request to update the file in the repository
-    # response = requests.put(url, headers=headers, json=payload)
-
     # Encode data to be sent as Base64
     content = json.dumps(data).encode('utf-8')
     encoded_content = base64.b64encode(content).decode('utf-8')
@@ -1247,21 +1184,24 @@ def update_cytoscape_elements(selected_value, marks, comparison_data):
 @app.callback(
     [Output('track-map-data', 'data'),
      Output('comparison', 'data', allow_duplicate=True)],
-    Input('session-data', 'data'),
+    [Input('session-data', 'data'),
+     Input('edit-map-data', 'data')],
     [State('track-map-data', 'data'),
      State('comparison', 'data')],
-     prevent_initial_call=True
-)
-def update_track(session_data, track_data, map_store):
-    track_data['elements'] = session_data['elements']
-    track_data['stylesheet'] = session_data['stylesheet']
-    map_store['Current'] = {}
-    map_store['Current']['elements'] = session_data['elements']
-    print(map_store['Current']['elements'])
-    return track_data, map_store
+     prevent_initial_call=True)
+
+def update_track(session_data, edit_map_data, track_data, map_store):
+    if not edit_map_data:
+        track_data['elements'] = session_data['elements']
+        track_data['stylesheet'] = session_data['stylesheet']
+        map_store['Current'] = {}
+        map_store = {'Current': {'elements': session_data['elements']}}
+    else:
+        track_data['elements'] = edit_map_data['elements']
+        map_store['Current'] = {}
+        map_store = {'Current': {'elements': edit_map_data['elements']}}
     
-# Update dcc.Store with edit_map if there is any
-# Update dcc.Store if different maps are uploaded
+    return track_data, map_store
 
 
 if __name__ == '__main__':
