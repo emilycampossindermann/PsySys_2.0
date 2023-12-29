@@ -140,6 +140,16 @@ app.layout = dbc.Container([
     dcc.Store(id='annotation-data', data={}, storage_type='session'),
     dcc.Store(id='edge-data', data={}, storage_type='session'),
     dcc.Store(id='comparison', data={}, storage_type='session'),
+    #dcc.Store(id='track-map-data', data={}, storage_type='session'),
+    dcc.Store(id='track-map-data', data={
+        'elements': [], 
+        'stylesheet': stylesheet,
+        'timeline-marks': {0: 'Current'},
+        'timeline-min': 0,
+        'timeline-max': 0,
+        'timeline-value': 0
+        
+}, storage_type='session'),
     dcc.Download(id='download-link'),
     html.Div(id='dummy-output', style={'display': 'none'})
 ])
@@ -155,9 +165,11 @@ app.layout = dbc.Container([
      Input('current-step', 'data')],
     [State('session-data', 'data'),
      State('color_scheme', 'data'),
-     State('sizing_scheme', 'data')]
+     State('sizing_scheme', 'data'),
+     State('track-map-data', 'data'),
+     State('comparison', 'data')]
 )
-def update_page_and_buttons(pathname, edit_map_data, current_step_data, session_data, color, sizing):
+def update_page_and_buttons(pathname, edit_map_data, current_step_data, session_data, color, sizing, track_data, map_store):
     step = current_step_data.get('step', 0)  # Default to step 0 if not found
 
     # Default button states
@@ -194,24 +206,36 @@ def update_page_and_buttons(pathname, edit_map_data, current_step_data, session_
 
         # Logic to create basic tab layout
         # Dummy variable for graph
+
+        # if not track_data:
+        #     track_data['elements'] = session_data['elements']
+        #     track_data['stylesheet'] = session_data['stylesheet']
+        #     track_data['timeline-marks'] = {0: 'Current'}
+        #     track_data['timeline-min'] = 0
+        #     track_data['timeline-max'] = 0
+        #     track_data['timeline-value'] = 0
+
+        map_store['Current'] = {}
+        map_store['Current']['elements'] = track_data['elements']
+
         content = html.Div([
         html.Br(), html.Br(), html.Br(),
         html.Div([cyto.Cytoscape(id='track-graph',
-                                 elements=session_data['elements'],
+                                 elements=track_data['elements'],
                                  layout={'name': 'cose', 'fit': True, 'padding': 10},
                                  zoom=1,
                                  pan={'x': 200, 'y': 200},
-                                 stylesheet = session_data['stylesheet'],
+                                 stylesheet =track_data['stylesheet'],
                                  style={'width': '90%', 'height': '470px'})
                     ], style={'flex': '1'}),
         
         html.Br(),
         # Dummy variable for timeline slider
         dcc.Slider(id='timeline-slider',
-                   marks={0: 'Current'},
-                   min=0,
-                   max=0,
-                   value=0,
+                   marks=track_data['timeline-marks'],
+                   min=track_data['timeline-min'],
+                   max=track_data['timeline-max'],
+                   value=track_data['timeline-value'],
                    step=None),
 
         html.Br(),
@@ -229,9 +253,6 @@ def update_page_and_buttons(pathname, edit_map_data, current_step_data, session_
         content = html.Div([
             html.Br(), html.Br(), html.Br(),
             html.Div([
-                #html.H6("Our Mission", style={'textAlign': 'center', 'fontFamily': 'Arial, sans-serif', 'fontWeight': 'bold'}),
-                #html.H3("Making mental-health more graspable for all", style={'textAlign': 'center', 'fontFamily': 'Arial, sans-serif'}),
-                #html.P("Describe your mission here...", style={'textAlign': 'center', 'maxWidth': '600px', 'margin': '0 auto'}),
                 html.H2("Making mental-health", style={'fontFamily': 'Courier New', 'marginLeft': '40px', 'fontWeight': 'bold'}),
                 html.H2("more graspable", style={'fontFamily': 'Courier New', 'marginLeft': '40px', 'fontWeight': 'bold'}),
                 html.H2("for all", style={'fontFamily': 'Courier New', 'marginLeft': '40px', 'fontWeight': 'bold'}),
@@ -239,12 +260,8 @@ def update_page_and_buttons(pathname, edit_map_data, current_step_data, session_
                 html.P("With PsySys our goal is to convey the concepts of the network approach to psychopathology directly to users. Thereby, we want to provide users with tools to better understand the dynamics underlying their mental distress. The educational content was created and evaluated within the Psychology Research Master Thesis by Emily Campos Sindermann at the University of Amsterdam (UvA). Since then, we have continued to develop PsySys as a stand-alone application to further investigate its potential clinical utility. We would also like to thank Dr. Lars Klintwal (Karolinska Institute) and Dr. Julian Burger (Yale University) for their active contribution in the creation of PsySys.", 
                        style={'maxWidth': '900px', 'marginLeft': '40px', 'color':'grey'}),
                 html.Hr(style={'maxWidth': '900px', 'marginLeft': '40px'}),
-                # Add more mission details as needed
             ]),
-            #html.Br(), html.Br(), html.Br(), html.Br(),
             html.Div([
-                #html.H6("Our Team", style={'textAlign': 'center', 'fontFamily': 'Arial, sans-serif', 'fontWeight': 'bold'}),
-                
             html.Div([
                 html.Div([
                     html.Img(src=app.get_asset_url('profile_emilycampossindermann.jpeg'), style={'width': '160px', 'height': '160px', 'borderRadius': '50%', 'marginRight': '70px'}),
@@ -268,8 +285,7 @@ def update_page_and_buttons(pathname, edit_map_data, current_step_data, session_
                 ], style={'display': 'inline-block', 'margin': '10px'}),
             ], style={'padding': '20px', 'maxWidth': '900px', 'margin': '0 auto', 'borderRadius': '10px', 'textAlign': 'center'})
 
-            ])#, style={'background-color': '#f2f2f2', 'padding': '20px', 'maxWidth': '700px', 'margin': '0 auto', 'borderRadius': '10px'})
-                # You can add more sections with relevant information
+            ])
             ])
 
     elif content is None:
@@ -396,20 +412,6 @@ def load_session_graph(n_clicks, session_data):
         return session_data
     # Return no update if the button wasn't clicked
     return dash.no_update      
-
-# Callback: Download graph as file
-# @app.callback(
-#     Output('download-link', 'data'),
-#     Input('download-file-btn', 'n_clicks'),
-#     State('edit-map-data', 'data'),
-#     prevent_initial_call=True
-# )
-# def generate_download(n_clicks, data):
-#     if n_clicks:
-#         # Convert the dictionary to a JSON string
-#         json_string = json.dumps(data)
-#         return dcc.send_bytes(json_string.encode('utf-8'), "my_mental_health_map.json")
-#     return dash.no_update
 
 def format_export_data(data, current_style, severity_scores, edge_data, annotations):
     elements = data['elements']
@@ -549,8 +551,8 @@ def open_node_edit_modal(tapNodeData, switch, severity_scores, annotations):
 
 # Callback: Reset tabnodedata on mode switch
 @app.callback(
-    Output('my-mental-health-map', 'tapNodeData'),  # Assuming 'tabNode' is the component storing the node data
-    Input('inspect-switch', 'value'),  # Assuming 'mode-switch' keeps track of the current mode
+    Output('my-mental-health-map', 'tapNodeData'),  
+    Input('inspect-switch', 'value'), 
     prevent_initial_call=True
 )
 def reset_node_data_on_click(switch):
@@ -1169,25 +1171,20 @@ def donate_button_clicked(n_clicks, data, current_style, severity_scores, edge_d
      Output('timeline-slider', 'max'), # timeline current value
      Output('timeline-slider', 'value'),
      Output('track-graph', 'elements'),
-     Output('comparison', 'data')], # cytoscape dummy
+     Output('comparison', 'data'),
+     Output('track-map-data', 'data', allow_duplicate=True)], # cytoscape dummy
     Input('upload-graph-tracking', 'contents'), # upload new file
     [State('timeline-slider', 'marks'), # timeline structure
      State('timeline-slider', 'max'), # timeline value
      State('timeline-slider', 'value'),
      State('track-graph', 'elements'),
-     State('comparison', 'data')]
+     State('comparison', 'data'),
+     State('track-map-data', 'data')],
+     prevent_initial_call = True
 )
-def upload_tracking_graph(contents, existing_marks, current_max, current_value, graph_data, map_store):
+def upload_tracking_graph(contents, existing_marks, current_max, current_value, graph_data, map_store, track_data):
     new_elements = graph_data
     if contents:
-        
-        # content_type, content_string = contents.split(',')[1]  # Splitting to extract the base64 content
-        # decoded = base64.b64decode(content_string)
-        # data = json.loads(decoded.decode('utf-8'))  # Assuming JSON file, adjust as needed
-
-        # # Extract date and time from the filename
-        # filename = content_type.split(';')[1].split('=')[1]  # Replace 'filename' with the correct key
-        # match = re.search(r"(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})", filename)
 
         content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
@@ -1212,9 +1209,14 @@ def upload_tracking_graph(contents, existing_marks, current_max, current_value, 
                 map_store[filename] = {}
                 map_store[filename]['elements'] = new_elements
 
-        return existing_marks, current_value, current_value, new_elements, map_store
+                # Update track_data
+                track_data['timeline-max'] = max_val
+                track_data['timeline-max'] = max_val
+                track_data['timeline-marks'] = existing_marks
 
-    return existing_marks, current_max, current_value, new_elements, map_store
+        return existing_marks, current_value, current_value, new_elements, map_store, track_data
+
+    return existing_marks, current_max, current_value, new_elements, map_store, track_data
 
 # Callback: Network comparison timeline navigation
 # When user navigates across timeline
@@ -1241,6 +1243,25 @@ def update_cytoscape_elements(selected_value, marks, comparison_data):
 
     # Return default elements or handle the case where selected_date is None
     return []
+
+@app.callback(
+    [Output('track-map-data', 'data'),
+     Output('comparison', 'data', allow_duplicate=True)],
+    Input('session-data', 'data'),
+    [State('track-map-data', 'data'),
+     State('comparison', 'data')],
+     prevent_initial_call=True
+)
+def update_track(session_data, track_data, map_store):
+    track_data['elements'] = session_data['elements']
+    track_data['stylesheet'] = session_data['stylesheet']
+    map_store['Current'] = {}
+    map_store['Current']['elements'] = session_data['elements']
+    print(map_store['Current']['elements'])
+    return track_data, map_store
+    
+# Update dcc.Store with edit_map if there is any
+# Update dcc.Store if different maps are uploaded
 
 
 if __name__ == '__main__':
