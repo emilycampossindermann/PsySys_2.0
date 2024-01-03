@@ -3,7 +3,8 @@
 from constants import factors, node_color, node_size
 from functions import generate_step_content, create_mental_health_map_tab, create_likert_scale
 from functions import map_add_chains, map_add_cycles, map_add_factors, add_edge, delete_edge, graph_color, color_scheme, node_sizing
-from functions import calculate_degree_centrality
+from functions import calculate_degree_centrality, apply_severity_size_styles, create_tracking_tab, create_about
+from functions import update_edge_opacity
 
 # Import libraries
 import dash
@@ -70,7 +71,7 @@ nav_col = dbc.Col(
             [
                 dbc.NavLink("Psychoeducation", href="/", active="exact"),
                 dbc.NavLink("Edit My Map", href="/my-mental-health-map", active="exact"),
-                dbc.NavLink("Track My Map", href="/track-my-mental-health-map", active="exact"),
+                dbc.NavLink("Compare My Map", href="/track-my-mental-health-map", active="exact"),
                 dbc.NavLink("About Us", href="/about", active="exact"),
             ],
             vertical=True,
@@ -139,11 +140,10 @@ app.layout = dbc.Container([
     dcc.Store(id='annotation-data', data={}, storage_type='session'),
     dcc.Store(id='edge-data', data={}, storage_type='session'),
     dcc.Store(id='comparison', data={}, storage_type='session'),
-    #dcc.Store(id='track-map-data', data={}, storage_type='session'),
     dcc.Store(id='track-map-data', data={
         'elements': [], 
         'stylesheet': stylesheet,
-        'timeline-marks': {0: 'Current'},
+        'timeline-marks': {0: 'PsySys map'},
         'timeline-min': 0,
         'timeline-max': 0,
         'timeline-value': 0
@@ -160,7 +160,7 @@ app.layout = dbc.Container([
      Output('next-button', 'style'),
      Output('next-button', 'children')],
     [Input('url', 'pathname'),
-     Input('edit-map-data', 'data'),  # Add this input
+     Input('edit-map-data', 'data'),  
      Input('current-step', 'data')],
     [State('session-data', 'data'),
      State('color_scheme', 'data'),
@@ -182,17 +182,17 @@ def update_page_and_buttons(pathname, edit_map_data, current_step_data, session_
         # Check the step and update accordingly
         if step == 0:
             content = generate_step_content(step, session_data)
-            next_button_text = "Start"       # Change text to "Start"
+            next_button_text = "Start"      
         elif step == 1:
             content = generate_step_content(step, session_data)
         elif 2 <= step <= 4:
             content = generate_step_content(step, session_data)
-            back_button_style = visible_style            # Show back button
-            next_button_style = visible_style            # Show next button
+            back_button_style = visible_style            
+            next_button_style = visible_style         
         elif step == 5:
             content = generate_step_content(step, session_data)
-            back_button_style = visible_style           # Show back button
-            next_button_text = "Redo"         # Change text to "Redo"
+            back_button_style = visible_style           
+            next_button_text = "Redo"      
 
     elif pathname == "/my-mental-health-map":
         content = create_mental_health_map_tab(edit_map_data, color, sizing)
@@ -200,81 +200,14 @@ def update_page_and_buttons(pathname, edit_map_data, current_step_data, session_
         next_button_style = hidden_style
 
     elif pathname == "/track-my-mental-health-map":
+        content = create_tracking_tab(track_data)
         back_button_style = hidden_style
         next_button_style = hidden_style
-
-        map_store['Current'] = {}
-        map_store['Current']['elements'] = track_data['elements']
-
-        content = html.Div([
-        html.Br(), html.Br(), html.Br(),
-        html.Div([cyto.Cytoscape(id='track-graph',
-                                 elements=track_data['elements'],
-                                 layout={'name': 'cose', 'fit': True, 'padding': 10},
-                                 zoom=1,
-                                 pan={'x': 200, 'y': 200},
-                                 stylesheet =track_data['stylesheet'],
-                                 style={'width': '90%', 'height': '470px'})
-                    ], style={'flex': '1'}),
-        
-        html.Br(),
-        # Dummy variable for timeline slider
-        dcc.Slider(id='timeline-slider',
-                   marks=track_data['timeline-marks'],
-                   min=track_data['timeline-min'],
-                   max=track_data['timeline-max'],
-                   value=track_data['timeline-value'],
-                   step=None),
-
-        html.Br(),
-
-        dcc.Upload(id='upload-graph-tracking',
-                   children=dbc.Button("Upload Map", id='upload-map-btn'),
-                   style={'display': 'inline-block'})
-
-        ])
 
     elif pathname == "/about":
+        content = create_about(app)
         back_button_style = hidden_style
         next_button_style = hidden_style
-        
-        content = html.Div([
-            html.Br(), html.Br(), html.Br(),
-            html.Div([
-                html.H2("Making mental-health", style={'fontFamily': 'Courier New', 'marginLeft': '40px', 'fontWeight': 'bold'}),
-                html.H2("more graspable", style={'fontFamily': 'Courier New', 'marginLeft': '40px', 'fontWeight': 'bold'}),
-                html.H2("for all", style={'fontFamily': 'Courier New', 'marginLeft': '40px', 'fontWeight': 'bold'}),
-                html.Br(),
-                html.P("With PsySys our goal is to convey the concepts of the network approach to psychopathology directly to users. Thereby, we want to provide users with tools to better understand the dynamics underlying their mental distress. The educational content was created and evaluated within the Psychology Research Master Thesis by Emily Campos Sindermann at the University of Amsterdam (UvA). Since then, we have continued to develop PsySys as a stand-alone application to further investigate its potential clinical utility. We would also like to thank Dr. Lars Klintwal (Karolinska Institute) and Dr. Julian Burger (Yale University) for their active contribution in the creation of PsySys.", 
-                       style={'maxWidth': '900px', 'marginLeft': '40px', 'color':'grey'}),
-                html.Hr(style={'maxWidth': '900px', 'marginLeft': '40px'}),
-            ]),
-            html.Div([
-            html.Div([
-                html.Div([
-                    html.Img(src=app.get_asset_url('DSC_4984.JPG'), style={'width': '160px', 'height': '160px', 'borderRadius': '50%', 'marginRight': '70px'}),
-                    html.P("Emily Campos Sindermann", style={'textAlign': 'center', 'marginTop': '10px', 'marginRight': '70px'}),
-                    html.P("Research Assistant (MSc)", style={'marginTop': '-15px', 'marginRight': '70px', 'fontStyle': 'italic'}),
-                    html.P("Developer", style={'marginTop': '-15px', 'color': 'grey', 'marginRight': '70px', 'fontStyle': 'italic'}),
-                ], style={'display': 'inline-block', 'margin': '10px'}),
-
-                html.Div([
-                    html.Img(src=app.get_asset_url('profile_dennyborsboom.jpeg'), style={'width': '160px', 'height': '160px', 'borderRadius': '50%', 'marginRight': '70px'}),
-                    html.P("Denny Borsboom", style={'textAlign': 'center', 'marginTop': '10px', 'marginRight': '70px'}),
-                    html.P("Professor at UvA", style={'marginTop': '-15px', 'marginRight': '70px', 'fontStyle': 'italic'}),
-                    html.P("1st Supervisor", style={'marginTop': '-15px', 'color': 'grey', 'marginRight': '70px', 'fontStyle': 'italic'}),
-                ], style={'display': 'inline-block', 'margin': '10px'}),
-
-                html.Div([
-                    html.Img(src=app.get_asset_url('profile_tessablanken.jpeg'), style={'width': '160px', 'height': '160px', 'borderRadius': '50%'}),
-                    html.P("Tessa Blanken", style={'textAlign': 'center', 'marginTop': '10px'}),
-                    html.P("Assistant Professor at UvA", style={'marginTop': '-15px', 'fontStyle': 'italic'}),
-                    html.P("2nd Supervisor", style={'marginTop': '-15px', 'color': 'grey', 'fontStyle': 'italic'}),
-                ], style={'display': 'inline-block', 'margin': '10px'}),
-            ], style={'padding': '20px', 'maxWidth': '900px', 'margin': '0 auto', 'borderRadius': '10px', 'textAlign': 'center'})
-
-            ])
-            ])
 
     elif content is None:
         content = html.Div("Page not found")
@@ -440,7 +373,8 @@ def format_export_data(data, current_style, severity_scores, edge_data, annotati
         'date': current_date
     }
     return exported_data
-    
+
+# Callback: Generate download file  
 @app.callback(
     Output('download-link', 'data'),
     Input('download-file-btn', 'n_clicks'),
@@ -674,12 +608,12 @@ def update_edge_data_and_close_modal(save_clicks, tapEdgeData, switch, strength,
     [Output('my-mental-health-map', 'elements'),
      Output('edit-edge', 'options'),
      Output('edit-map-data', 'data', allow_duplicate=True),
-     Output('severity-scores', 'data', allow_duplicate=True)],  # Add this output
+     Output('severity-scores', 'data', allow_duplicate=True)], 
     [Input('btn-plus-node', 'n_clicks')],
     [State('edit-node', 'value'),
      State('my-mental-health-map', 'elements'),
      State('edit-map-data', 'data'),
-     State('severity-scores', 'data')],  # Add this state
+     State('severity-scores', 'data')],  
      prevent_initial_call=True
 )
 def map_add_node(n_clicks, node_name, elements, edit_map_data, severity_scores):
@@ -703,12 +637,12 @@ def map_add_node(n_clicks, node_name, elements, edit_map_data, severity_scores):
     [Output('my-mental-health-map', 'elements', allow_duplicate=True),
      Output('edit-edge', 'options', allow_duplicate=True),
      Output('edit-map-data', 'data', allow_duplicate=True),
-     Output('severity-scores', 'data', allow_duplicate=True)],  # Add this output
+     Output('severity-scores', 'data', allow_duplicate=True)],  
     [Input('btn-minus-node', 'n_clicks')],
     [State('edit-node', 'value'),
      State('my-mental-health-map', 'elements'),
      State('edit-map-data', 'data'),
-     State('severity-scores', 'data')],  # Add this state
+     State('severity-scores', 'data')],  
      prevent_initial_call=True
 )
 def delete_node(n_clicks, node_id, elements, edit_map_data, severity_scores):
@@ -763,7 +697,6 @@ def add_edge_output(n_clicks, new_edge, elements, edit_map_data):
 
     return elements, edit_map_data
 
-
 # Callback: Delete existing edge from graph
 @app.callback(
     [Output('my-mental-health-map', 'elements', allow_duplicate=True),
@@ -778,7 +711,6 @@ def delete_edge_output(n_clicks, edge, elements, edit_map_data):
     if n_clicks and edge and len(edge) == 2:
         source, target = edge
 
-        # Assuming existing_edges is a set of tuples (source, target)
         existing_edges = set([(e['data']['source'], e['data']['target']) for e in elements if 'source' in e.get('data', {})])
 
         delete_edge(source, target, elements, existing_edges)
@@ -826,7 +758,7 @@ def set_node_sizes(selected_scheme, stylesheet, edit_map_data, severity_scores):
         if 'stylesheet' in edit_map_data:
             stylesheet = edit_map_data['stylesheet']
         else:
-            stylesheet = []  # or some default stylesheet
+            stylesheet = [] 
         return stylesheet, edit_map_data
     else:
         return dash.no_update
@@ -872,11 +804,6 @@ def update_severity_scores(severity_values, session_data, existing_severity_scor
     # Update the existing severity scores with new values
     for factor, value in zip(current_factors, severity_values):
         existing_severity_scores[factor] = value
-
-    # Remove severity scores for factors that are no longer present
-    # factors_to_remove = set(existing_severity_scores.keys()) - set(current_factors)
-    # for factor in factors_to_remove:
-    #     existing_severity_scores.pop(factor, None)
 
     return existing_severity_scores
 
@@ -1080,6 +1007,7 @@ def donation_modal(n_clicks, is_open):
         return not is_open
     return is_open
 
+# Callback: Donation button functionality
 @app.callback(
     Output('dummy-output', 'children'),
     Input('donation-agree', 'n_clicks'),
@@ -1098,35 +1026,40 @@ def donate_button_clicked(n_clicks, data, current_style, severity_scores, edge_d
     return 'Donate to send data to GitHub'
 
 # Callback: Network comparison file upload
-# Extract date & time
-# If not already in marks: add date + time as key in marks
-# Augment max=1
-# Change value to current (position of current in marks)
-# Jump to this timepoint and display the new graph (feed into dummy cytoscape)
 @app.callback(
-    [Output('timeline-slider', 'marks'), # timeline structure
-     Output('timeline-slider', 'max'), # timeline current value
+    [Output('timeline-slider', 'marks'), 
+     Output('timeline-slider', 'max'), 
      Output('timeline-slider', 'value'),
      Output('track-graph', 'elements'),
      Output('comparison', 'data'),
-     Output('track-map-data', 'data', allow_duplicate=True)], # cytoscape dummy
-    Input('upload-graph-tracking', 'contents'), # upload new file
-    [State('timeline-slider', 'marks'), # timeline structure
-     State('timeline-slider', 'max'), # timeline value
+     Output('track-map-data', 'data', allow_duplicate=True)],
+     #Output('track-graph', 'stylesheet')], 
+    Input('upload-graph-tracking', 'contents'), 
+    [State('timeline-slider', 'marks'), 
+     State('timeline-slider', 'max'),
      State('timeline-slider', 'value'),
      State('track-graph', 'elements'),
      State('comparison', 'data'),
-     State('track-map-data', 'data')],
+     State('track-map-data', 'data'),
+     State('track-graph', 'stylesheet')],
      prevent_initial_call = True
 )
-def upload_tracking_graph(contents, existing_marks, current_max, current_value, graph_data, map_store, track_data):
+def upload_tracking_graph(contents, existing_marks, current_max, current_value, graph_data, map_store, track_data, stylesheet):
     new_elements = graph_data
     if contents:
 
         content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
         data = json.loads(decoded.decode('utf-8'))  # Assuming JSON file, adjust as needed
+
+        print(data)
+
         new_elements = data.get('elements', [])
+        edge_strength = data.get['edge-data', []]
+
+        severity = data.get('severity-scores', [])
+        stylesheet_new = stylesheet
+
         # Extract filename from the contents object
         filename = data['date']
         match = re.search(r"(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})", filename)
@@ -1144,12 +1077,25 @@ def upload_tracking_graph(contents, existing_marks, current_max, current_value, 
 
                 # Add to map_store
                 map_store[filename] = {}
-                map_store[filename]['elements'] = new_elements
+                #map_store[filename] = {'elements': new_elements}
 
                 # Update track_data
                 track_data['timeline-max'] = max_val
                 track_data['timeline-max'] = max_val
                 track_data['timeline-marks'] = existing_marks
+        
+                style = apply_severity_size_styles("Severity", stylesheet, severity, stylesheet_new)
+
+                # Update edge styles based on strength
+                if edge_strength:
+                    for edge in new_elements:
+                        if 'edge' in edge.get('data', {}) and edge['data']['id'] in track_data.get('edges', {}):
+                            edge_id = edge['data']['id']
+                            stylesheet = update_edge_opacity(edge_id, edge_strength, stylesheet)
+
+                map_store[filename] = {'elements': new_elements, 
+                                       'stylesheet': style}
+
 
         return existing_marks, current_value, current_value, new_elements, map_store, track_data
 
@@ -1160,13 +1106,16 @@ def upload_tracking_graph(contents, existing_marks, current_max, current_value, 
 # Select file in dict that correspond to chosen date + time
 # Feed in this file into dummy cytoscape 
 @app.callback(
-    Output('track-graph', 'elements', allow_duplicate=True),
+    [Output('track-graph', 'elements', allow_duplicate=True),
+     Output('track-graph', 'stylesheet')],
     Input('timeline-slider', 'value'),
     State('timeline-slider', 'marks'),
     State('comparison', 'data'),
+    State('session-data', 'data'),
+    State('severity-scores', 'data'),
     prevent_initial_call=True
 )
-def update_cytoscape_elements(selected_value, marks, comparison_data):
+def update_cytoscape_elements(selected_value, marks, comparison_data, session_data, severity_scores):
     selected_date = None
     
     if comparison_data is not None:
@@ -1176,30 +1125,30 @@ def update_cytoscape_elements(selected_value, marks, comparison_data):
             selected_date = label
 
         if selected_date is not None:
-            return comparison_data[selected_date]['elements']
+            if selected_date != "PsySys map": 
+                return comparison_data[selected_date]['elements'], comparison_data[selected_date]['stylesheet']
+            else: 
+                stylesheet = apply_severity_size_styles("Severity", session_data['stylesheet'], severity_scores, session_data['stylesheet'])
+                return comparison_data[selected_date]['elements'], stylesheet
 
     # Return default elements or handle the case where selected_date is None
-    return []
+    return [], []
 
+# Callback: Populate tracking graph with PsySys map
 @app.callback(
     [Output('track-map-data', 'data'),
      Output('comparison', 'data', allow_duplicate=True)],
-    [Input('session-data', 'data'),
-     Input('edit-map-data', 'data')],
+    Input('session-data', 'data'),
     [State('track-map-data', 'data'),
      State('comparison', 'data')],
      prevent_initial_call=True)
 
-def update_track(session_data, edit_map_data, track_data, map_store):
-    if not edit_map_data:
-        track_data['elements'] = session_data['elements']
-        track_data['stylesheet'] = session_data['stylesheet']
-        map_store['Current'] = {}
-        map_store = {'Current': {'elements': session_data['elements']}}
-    else:
-        track_data['elements'] = edit_map_data['elements']
-        map_store['Current'] = {}
-        map_store = {'Current': {'elements': edit_map_data['elements']}}
+def update_track(session_data, track_data, map_store):
+    track_data['elements'] = session_data['elements']
+    track_data['stylesheet'] = session_data['stylesheet']
+
+    map_store['PsySys map'] = {}
+    map_store['PsySys map']['elements'] = session_data['elements']
     
     return track_data, map_store
 

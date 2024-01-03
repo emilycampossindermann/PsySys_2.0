@@ -5,7 +5,6 @@ from dash import dcc, html
 from dash.dependencies import Input, Output, State, MATCH, ALL
 import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
-import copy
 
 # Function: Embed YouTube video 
 def create_iframe(src):
@@ -177,7 +176,6 @@ def create_mental_health_map_tab(edit_map_data, color_scheme_data, sizing_scheme
     return html.Div([
         html.Br(),
         html.Br(),
-        # html.H3("My Mental-Health Map"),
         html.Div([
             html.Div([
                 cyto.Cytoscape(
@@ -206,7 +204,6 @@ def create_mental_health_map_tab(edit_map_data, color_scheme_data, sizing_scheme
                     dbc.Button("Download as File ", id='download-file-btn'),
                     dbc.Button("Download as Image", id='download-image-btn'),
                     dbc.Button("Donate", id="donate-btn", color="success")
-                               #style={'backgroundColor': '#4CBB17', 'border': 'none', 'color':'white'})
                 ], style={'display': 'flex', 'marginTop': '10px', 'gap': '10px'})
             ], style={'flex': '1'}),
 
@@ -321,6 +318,78 @@ def create_mental_health_map_tab(edit_map_data, color_scheme_data, sizing_scheme
         ], style={'display': 'flex', 'height': '470px', 'alignItems': 'flex-start'}),
     ])
 
+# Function: Create tracking tab
+def create_tracking_tab(track_data, ):
+    return html.Div([
+        html.Br(), html.Br(), html.Br(),
+        html.Div([cyto.Cytoscape(id='track-graph',
+                                 elements=track_data['elements'],
+                                 #layout={'name': 'cose', 'fit': True, 'padding': 10},
+                                 layout={'name': 'circle'},
+                                 zoom=1,
+                                 pan={'x': 200, 'y': 200},
+                                 stylesheet =track_data['stylesheet'],
+                                 style={'width': '90%', 'height': '470px'})
+                    ], style={'flex': '1'}),
+        
+        html.Br(),
+    
+        dcc.Slider(id='timeline-slider',
+                   marks=track_data['timeline-marks'],
+                   min=track_data['timeline-min'],
+                   max=track_data['timeline-max'],
+                   value=track_data['timeline-value'],
+                   step=None),
+
+        html.Br(),
+
+        html.Div([
+            dcc.Upload(id='upload-graph-tracking', children = dbc.Button("Upload Map", id='upload-map-btn'),
+                   style={'display': 'inline-block'}),
+            dbc.Button("🗑️", id='delete-tracking-map', color="danger", style={'marginLeft': '10px'}),
+                   ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'})
+    ])
+
+# Function: Create About us tab
+def create_about(app):
+    return html.Div([
+            html.Br(), html.Br(), html.Br(),
+            html.Div([
+                html.H2("Making mental-health", style={'fontFamily': 'Courier New', 'marginLeft': '40px', 'fontWeight': 'bold'}),
+                html.H2("more graspable", style={'fontFamily': 'Courier New', 'marginLeft': '40px', 'fontWeight': 'bold'}),
+                html.H2("for all", style={'fontFamily': 'Courier New', 'marginLeft': '40px', 'fontWeight': 'bold'}),
+                html.Br(),
+                html.P("With PsySys our goal is to convey the concepts of the network approach to psychopathology directly to users. Thereby, we want to provide users with tools to better understand the dynamics underlying their mental distress. The educational content was created and evaluated within the Psychology Research Master Thesis by Emily Campos Sindermann at the University of Amsterdam (UvA). Since then, we have continued to develop PsySys as a stand-alone application to further investigate its potential clinical utility. We would also like to thank Dr. Lars Klintwal (Karolinska Institute) and Dr. Julian Burger (Yale University) for their active contribution in the creation of PsySys.", 
+                       style={'maxWidth': '900px', 'marginLeft': '40px', 'color':'grey'}),
+                html.Hr(style={'maxWidth': '900px', 'marginLeft': '40px'}),
+            ]),
+            html.Div([
+            html.Div([
+                html.Div([
+                    html.Img(src=app.get_asset_url('DSC_4984.JPG'), style={'width': '160px', 'height': '160px', 'borderRadius': '50%', 'marginRight': '70px'}),
+                    html.P("Emily Campos Sindermann", style={'textAlign': 'center', 'marginTop': '10px', 'marginRight': '70px'}),
+                    html.P("Research Assistant (MSc)", style={'marginTop': '-15px', 'marginRight': '70px', 'fontStyle': 'italic'}),
+                    html.P("Developer", style={'marginTop': '-15px', 'color': 'grey', 'marginRight': '70px', 'fontStyle': 'italic'}),
+                ], style={'display': 'inline-block', 'margin': '10px'}),
+
+                html.Div([
+                    html.Img(src=app.get_asset_url('profile_dennyborsboom.jpeg'), style={'width': '160px', 'height': '160px', 'borderRadius': '50%', 'marginRight': '70px'}),
+                    html.P("Denny Borsboom", style={'textAlign': 'center', 'marginTop': '10px', 'marginRight': '70px'}),
+                    html.P("Professor at UvA", style={'marginTop': '-15px', 'marginRight': '70px', 'fontStyle': 'italic'}),
+                    html.P("1st Supervisor", style={'marginTop': '-15px', 'color': 'grey', 'marginRight': '70px', 'fontStyle': 'italic'}),
+                ], style={'display': 'inline-block', 'margin': '10px'}),
+
+                html.Div([
+                    html.Img(src=app.get_asset_url('profile_tessablanken.jpeg'), style={'width': '160px', 'height': '160px', 'borderRadius': '50%'}),
+                    html.P("Tessa Blanken", style={'textAlign': 'center', 'marginTop': '10px'}),
+                    html.P("Assistant Professor at UvA", style={'marginTop': '-15px', 'fontStyle': 'italic'}),
+                    html.P("2nd Supervisor", style={'marginTop': '-15px', 'color': 'grey', 'fontStyle': 'italic'}),
+                ], style={'display': 'inline-block', 'margin': '10px'}),
+            ], style={'padding': '20px', 'maxWidth': '900px', 'margin': '0 auto', 'borderRadius': '10px', 'textAlign': 'center'})
+
+            ])
+            ])
+
 # Function: Initiate graph with elements
 def map_add_factors(session_data, value, severity_score):
     if value is None:
@@ -377,43 +446,11 @@ def delete_edge(source, target, elements, existing_edges):
     # Remove the edge from existing_edges if it's stored as a tuple (source, target)
     existing_edges.discard((source, target))
 
-# Function: Include causal chains into the map  
-# def map_add_chains(session_data, chain1, chain2):
-#     map_elements = session_data['elements']
-#     existing_edges = setc(session_data['edges'])
-#     previous_chain1 = session_data['dropdowns']['chain1']['value'] or []
-#     previous_chain2 = session_data['dropdowns']['chain2']['value'] or []
-
-#     # Function to check if a factor exists in elements
-#     def factor_exists(factor, elements):
-#         return any(element.get('data', {}).get('id') == factor for element in elements)
-
-#     # Process chain1 and chain2
-#     for chain in [chain1, chain2]:
-#         if chain is not None:
-#             for i in range(len(chain) - 1):
-#                 source, target = chain[i], chain[i + 1]
-#                 if factor_exists(source, map_elements) and factor_exists(target, map_elements):
-#                     add_edge(source, target, map_elements, existing_edges)
-
-#     session_data['elements'] = map_elements
-#     session_data['dropdowns']['chain1']['value'] = chain1
-#     session_data['dropdowns']['chain2']['value'] = chain2
-#     session_data['edges'] = list(existing_edges)
-
-#     return session_data
-
-# Function to check if a factor exists in elements
+# Function: Check if a factor exists in elements
 def factor_exists(factor, elements):
     return any(element.get('data', {}).get('id') == factor for element in elements)
-    
-# def remove_chain_edges(chain, elements, existing_edges):
-#     for i in range(len(chain) - 1):
-#         source, target = chain[i], chain[i + 1]
-#         elements[:] = [e for e in elements if not ('source' in e.get('data', {}) and e['data']['source'] == source and e['data']['target'] == target)]
-#         # Remove from existing_edges
-#         existing_edges[:] = [e for e in existing_edges if not ('source' in e.get('data', {}) and e['data']['source'] == source and e['data']['target'] == target)]
 
+# Function: Remove chain edges    
 def remove_chain_edges(chain, elements, existing_edges, cycles):
     cycle_edges = set()
     for cycle in cycles:
@@ -427,12 +464,13 @@ def remove_chain_edges(chain, elements, existing_edges, cycles):
             elements[:] = [e for e in elements if not ('source' in e.get('data', {}) and e['data']['source'] == edge[0] and 'target' in e.get('data', {}) and e['data']['target'] == edge[1])]
             existing_edges[:] = [e for e in existing_edges if not ('source' in e.get('data', {}) and e['data']['source'] == edge[0] and e['data']['target'] == edge[1])]
 
-# Function to add an edge to the elements
+# Function: Add an edge to the elements
 def add_edge_new(source, target, elements):
     edge_data = {'data': {'source': source, 'target': target}}
     if not any(e.get('data') == edge_data['data'] for e in elements):
         elements.append(edge_data)
 
+# Function: Add chain elements
 def map_add_chains(session_data, chain1, chain2):
     map_elements = session_data['elements']
     previous_chain1 = session_data['dropdowns']['chain1']['value'] or []
@@ -444,8 +482,6 @@ def map_add_chains(session_data, chain1, chain2):
 
     # Remove previous selections from elements
     for selection in [previous_chain1, previous_chain2]:
-        # Only remove if this edge is not contained in session_data['dropdowns']['cycle1']['value']
-        # remove_chain_edges(selection, map_elements, existing_edges)
         remove_chain_edges(selection, map_elements, existing_edges, [cycle1, cycle2])
 
     # Process chain1 and chain2
@@ -463,42 +499,7 @@ def map_add_chains(session_data, chain1, chain2):
 
     return session_data
 
-# Function: Add vicious cycles into the map 
-# def map_add_cycles(session_data, cycle1, cycle2):
-#     map_elements = session_data['elements']
-#     existing_edges = set(session_data['edges'])
-
-#     for cycle in [cycle1, cycle2]:
-#         if cycle is not None:
-#             # If the cycle has only one element, create a self-reinforcing loop
-#             if len(cycle) == 1:
-#                 # Create a self-reinforcing loop for single-element cycles
-#                 element = cycle[0]
-#                 if factor_exists(element, map_elements):
-#                     add_edge(element, element, map_elements, existing_edges)
-#             if len(cycle) > 1:
-#                 # Create a loop that connects each element to the next, and the last element to the first
-#                 for i in range(len(cycle)):
-#                     source = cycle[i]
-#                     target = cycle[0] if i == len(cycle) - 1 else cycle[i + 1]
-#                     if factor_exists(source, map_elements) and factor_exists(target, map_elements):
-#                         add_edge(source, target, map_elements, existing_edges)
-
-#     session_data['elements'] = map_elements
-#     session_data['edges'] = list(existing_edges)
-#     session_data['dropdowns']['cycle1']['value'] = cycle1
-#     session_data['dropdowns']['cycle2']['value'] = cycle2
-#     return session_data
-
-# def remove_cycle_edges(cycle, elements, existing_edges):
-#     for i in range(len(cycle)):
-#         source = cycle[i]
-#         target = cycle[0] if i == len(cycle) - 1 else cycle[i + 1]
-#         # Remove from elements
-#         elements[:] = [e for e in elements if not ('source' in e.get('data', {}) and e['data']['source'] == source and e['data']['target'] == target)]
-#         edge_tuple = (source, target)
-#         existing_edges.discard(edge_tuple)
-
+# Function: Remove cycle edges
 def remove_cycle_edges(cycle, elements, existing_edges, chains):
     # Gather all edges from chain1 and chain2
     chain_edges = set()
@@ -518,7 +519,7 @@ def remove_cycle_edges(cycle, elements, existing_edges, chains):
             elements[:] = [e for e in elements if not ('source' in e.get('data', {}) and e['data']['source'] == source and 'target' in e.get('data', {}) and e['data']['target'] == target)]
             existing_edges.discard(edge)
 
-
+# Function: Add cycles
 def map_add_cycles(session_data, cycle1, cycle2):
     map_elements = session_data['elements']
     existing_edges = set(session_data['edges'])
@@ -659,10 +660,9 @@ def apply_centrality_color_styles(type, stylesheet, elements):
             # Normalized degree value when max and min degrees are different
             normalized_degree = (degree - min_degree) / (max_degree - min_degree)
         else:
-            # Default normalized value when max and min degrees are the same
-            normalized_degree = 0.5  # or any default value that suits your application
+            normalized_degree = 0.5 
 
-        r, g, b = get_color(normalized_degree)  # Assuming get_color is defined as before
+        r, g, b = get_color(normalized_degree) 
 
         degree_style = {
             'selector': f'node[id="{node_id}"]',
@@ -670,7 +670,6 @@ def apply_centrality_color_styles(type, stylesheet, elements):
                 'background-color': f'rgb({r},{g},{b})'
             }
         }
-        # Append the style for this node
         stylesheet.append(degree_style)
 
     return stylesheet
@@ -819,6 +818,7 @@ def color_target(graph_data):
     graph_data['stylesheet'] = stylesheet
     return graph_data
 
+# Function: Reset target color
 def reset_target(graph_data):
     stylesheet = graph_data['stylesheet']
     new_stylesheet = [style for style in stylesheet 
@@ -829,11 +829,21 @@ def reset_target(graph_data):
 # Function: Color graph (out-degree centrality, target node)
 def graph_color(session_data, severity_scores):
 
-    # Add influential node style
-    #session_data = color_scheme(type="Severity", graph_data=session_data, severity_scores=severity_scores)
     session_data = reset_target(session_data)
     session_data = color_target(session_data)
 
     session_data = node_sizing(chosen_scheme="Severity", graph_data=session_data, severity_scores=severity_scores)
 
     return session_data
+
+# Function: Updates edge styles based on strength
+def update_edge_opacity(edge_id, strength, stylesheet):
+    opacity = strength / 5  # Adjust opacity based on strength
+    tapped_edge_style = {
+        'selector': f'edge[id="{edge_id}"]',
+        'style': {'opacity': opacity}
+    }
+    # Create a new stylesheet with updated style for the edge
+    new_stylesheet = [rule for rule in stylesheet if rule['selector'] != f'edge[id="{edge_id}"]']
+    new_stylesheet.append(tapped_edge_style)
+    return new_stylesheet
