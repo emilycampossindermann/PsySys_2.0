@@ -1052,10 +1052,8 @@ def upload_tracking_graph(contents, existing_marks, current_max, current_value, 
         decoded = base64.b64decode(content_string)
         data = json.loads(decoded.decode('utf-8'))  # Assuming JSON file, adjust as needed
 
-        print(data)
-
         new_elements = data.get('elements', [])
-        edge_strength = data.get['edge-data', []]
+        #edge_strength = data.get['edge-data', []]
 
         severity = data.get('severity-scores', [])
         stylesheet_new = stylesheet
@@ -1071,7 +1069,18 @@ def upload_tracking_graph(contents, existing_marks, current_max, current_value, 
             if date_time not in existing_marks.values():
                 max_val = current_max + 1
                 existing_marks[max_val] = date_time
-                
+
+                # existing_marks = {k: v for k, v in sorted(existing_marks.items(), key=lambda item: item[1], reverse=True)}
+                # date_time_dict = {}
+                # for k, v in existing_marks.items():
+                #     try:
+                #         date_time_dict[k] = datetime.strptime(v, "%Y-%m-%d_%H-%M-%S")
+                #     except ValueError:
+                #         pass  # Handle the non-conforming entry here if needed
+
+                # # Sort based on datetime objects
+                # existing_marks = {k: v.strftime("%Y-%m-%d_%H-%M-%S") for k, v in sorted(date_time_dict.items(), key=lambda item: item[1], reverse=True)}
+
                 # Set the timeline slider to the new date/time position
                 current_value = max_val
 
@@ -1087,11 +1096,11 @@ def upload_tracking_graph(contents, existing_marks, current_max, current_value, 
                 style = apply_severity_size_styles("Severity", stylesheet, severity, stylesheet_new)
 
                 # Update edge styles based on strength
-                if edge_strength:
-                    for edge in new_elements:
-                        if 'edge' in edge.get('data', {}) and edge['data']['id'] in track_data.get('edges', {}):
-                            edge_id = edge['data']['id']
-                            stylesheet = update_edge_opacity(edge_id, edge_strength, stylesheet)
+                # if edge_strength:
+                #     for edge in new_elements:
+                #         if 'edge' in edge.get('data', {}) and edge['data']['id'] in track_data.get('edges', {}):
+                #             edge_id = edge['data']['id']
+                #             stylesheet = update_edge_opacity(edge_id, edge_strength, stylesheet)
 
                 map_store[filename] = {'elements': new_elements, 
                                        'stylesheet': style}
@@ -1152,6 +1161,70 @@ def update_track(session_data, track_data, map_store):
     
     return track_data, map_store
 
+# Callback: Delete current map from map store & mark & reduce max_value
+@app.callback(
+    [Output('timeline-slider', 'marks', allow_duplicate=True),
+     Output('timeline-slider', 'max', allow_duplicate=True),
+     Output('timeline-slider', 'value', allow_duplicate=True),
+     Output('comparison', 'data', allow_duplicate=True)],
+    Input('delete-tracking-map', 'n_clicks'),
+    State('timeline-slider', 'marks'),
+    State('timeline-slider', 'max'),
+    State('timeline-slider', 'value'),
+    State('track-graph', 'elements'),
+    State('comparison', 'data'),
+    State('track-map-data', 'data'),
+    prevent_initial_call=True
+)
+def delete_current_map(n_clicks, existing_marks, current_max, current_value, graph_data, map_store, track_data): 
+
+    if n_clicks:
+        selected_date = None
+
+        # Convert string keys in marks to integers
+        existing_marks = {int(k): v for k, v in existing_marks.items()}
+
+        # Ensure the current value is an integer
+        current_value = int(current_value)
+
+        # Fetch the currently selected date based on the timeline value
+        for key, value in existing_marks.items():
+            if key == current_value:
+                selected_date = value
+                break
+
+        if selected_date and selected_date in map_store:
+            del map_store[selected_date]
+
+            # Remove the corresponding mark from the timeline
+            existing_marks = {k: v for k, v in existing_marks.items() if v != selected_date}
+
+            # Update the max value if the current value is higher
+            if current_value > current_max:
+                current_max = current_value
+
+            # If the current value is at the maximum, reduce it
+            if current_value == current_max:
+                current_value -= 1
+
+            # Redistribute existing marks
+            new_marks = {}
+            for key, value in existing_marks.items():
+                print(key)
+                print(current_value)
+                if key > current_value:
+                    new_marks[key - 1] = value
+                else:
+                    new_marks[key] = value
+
+            current_max = current_max-1
+
+            # print(new_marks)
+            # print({k: v for k, v in sorted(new_marks.items(), key=lambda item: item[1], reverse=True)})
+
+            return new_marks, current_max, current_value, map_store
+
+    return existing_marks, current_max, current_value, map_store
 
 if __name__ == '__main__':
     app.run_server(debug=True, port=8069)
