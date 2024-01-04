@@ -1,0 +1,109 @@
+style.css
+.sidebar {
+    height: 100vh; /* Full height */
+    position: fixed; /* Fixed, to stay in place during page scroll */
+    right: 0; /* Align to the right side */
+    top: 0; /* Align to the top */
+    overflow-x: hidden; /* Hide horizontal overflow */
+    transition: width 0.5s; /* Smooth transition for width */
+}
+
+.sidebar-collapsed {
+    width: 50px; /* Width of the sidebar when collapsed */
+}
+
+.sidebar-expanded {
+    width: 250px; /* Width of the sidebar when expanded */
+}
+
+.content-container {
+    transition: margin-right 0.5s; /* Smooth transition for margin */
+    /* Other styling for content */
+}
+
+.content-container-expanded {
+    margin-right: 250px; /* Adjust the margin to match the expanded sidebar */
+}
+
+.radio-group {
+    padding-left: 0px; /* Adjust the padding to move the group to the left */
+}
+
+/* Specific styles for your toggle */
+.btn-check:checked + .btn-outline-primary {
+    color: #fff;
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.custom-textarea {
+    border-radius: 10px !important;
+    border: 1px solid #CCCCCC;
+}
+
+/* In your CSS file (e.g., assets/main.css) */
+.node-tooltip {
+    background-color: #fff;
+    border-color: #000;
+    border-width: 1px;
+    border-style: solid;
+    font-size: 12px;
+    padding: 5px;
+    z-index: 9999; /* Ensure tooltip is displayed above other elements */
+    display: none; /* Initially hidden */
+}
+
+.node:hover .node-tooltip {
+    display: block;
+}
+
+.custom-switch {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 34px;
+}
+
+.custom-switch-input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.custom-switch-input:checked + .slider {
+    background-color: #2196F3;
+}
+
+.custom-switch-input:focus + .slider {
+    box-shadow: 0 0 1px #2196F3;
+}
+
+.custom-switch-input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+/* Slider */
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
