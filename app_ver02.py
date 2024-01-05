@@ -976,7 +976,7 @@ def send_to_github(data):
     repo_name = 'PsySys_2.0'
     current_date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     file_path = f"data-donation/graph_{current_date}.json"
-    access_token = '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'  # Use a secret for production
+    access_token = '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'  # Use a secret for production
     
     url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{file_path}'
     headers = {'Authorization': f'token {access_token}'}
