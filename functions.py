@@ -359,36 +359,53 @@ def create_about(app):
                 html.H2("more graspable", style={'fontFamily': 'Courier New', 'marginLeft': '40px', 'fontWeight': 'bold'}),
                 html.H2("for all", style={'fontFamily': 'Courier New', 'marginLeft': '40px', 'fontWeight': 'bold'}),
                 html.Br(),
-                html.P("With PsySys our goal is to convey the concepts of the network approach to psychopathology directly to users. Thereby, we want to provide users with tools to better understand the dynamics underlying their mental distress. The educational content was created and evaluated within the Psychology Research Master Thesis by Emily Campos Sindermann at the University of Amsterdam (UvA). Since then, we have continued to develop PsySys as a stand-alone application to further investigate its potential clinical utility. We would also like to thank Dr. Lars Klintwal (Karolinska Institute) and Dr. Julian Burger (Yale University) for their active contribution in the creation of PsySys.", 
+                html.P("With PsySys our goal is to convey the concepts of the network approach to psychopathology directly to users. Thereby, we want to provide users with tools to better understand the dynamics underlying their mental distress. The educational content was created and evaluated within the Psychology Research Master Thesis by Emily Campos Sindermann at the University of Amsterdam (UvA). Since then, we have continued to develop PsySys as a stand-alone application to further investigate its potential clinical utility.", 
                        style={'maxWidth': '900px', 'marginLeft': '40px', 'color':'grey'}),
                 html.Hr(style={'maxWidth': '900px', 'marginLeft': '40px'}),
             ]),
             html.Div([
             html.Div([
                 html.Div([
-                    html.Img(src=app.get_asset_url('DSC_4984.JPG'), style={'width': '160px', 'height': '160px', 'borderRadius': '50%', 'marginRight': '70px'}),
-                    html.P("Emily Campos Sindermann", style={'textAlign': 'center', 'marginTop': '10px', 'marginRight': '70px'}),
-                    html.P("Research Assistant (MSc)", style={'marginTop': '-15px', 'marginRight': '70px', 'fontStyle': 'italic'}),
-                    html.P("Developer", style={'marginTop': '-15px', 'color': 'grey', 'marginRight': '70px', 'fontStyle': 'italic'}),
+                    html.Img(src=app.get_asset_url('DSC_4984.JPG'), style={'width': '160px', 'height': '160px', 'borderRadius': '50%', 'marginRight': '70px', 'marginLeft': '70px'}),
+                    html.P("Emily Campos Sindermann", style={'textAlign': 'center', 'marginTop': '10px', 'marginRight': '70px', 'marginLeft': '70px'}),
+                    html.P("Research Assistant (MSc)", style={'marginTop': '-15px', 'marginRight': '70px', 'fontStyle': 'italic', 'marginLeft': '70px'}),
+                    html.P("Developer", style={'marginTop': '-15px', 'color': 'grey', 'marginRight': '70px', 'fontStyle': 'italic', 'marginLeft': '70px'}),
                 ], style={'display': 'inline-block', 'margin': '10px'}),
 
                 html.Div([
-                    html.Img(src=app.get_asset_url('profile_dennyborsboom.jpeg'), style={'width': '160px', 'height': '160px', 'borderRadius': '50%', 'marginRight': '70px'}),
-                    html.P("Denny Borsboom", style={'textAlign': 'center', 'marginTop': '10px', 'marginRight': '70px'}),
-                    html.P("Professor at UvA", style={'marginTop': '-15px', 'marginRight': '70px', 'fontStyle': 'italic'}),
-                    html.P("1st Supervisor", style={'marginTop': '-15px', 'color': 'grey', 'marginRight': '70px', 'fontStyle': 'italic'}),
+                    html.Img(src=app.get_asset_url('profile_dennyborsboom.jpeg'), style={'width': '160px', 'height': '160px', 'borderRadius': '50%', 'marginRight': '90px'}),
+                    html.P("Denny Borsboom", style={'textAlign': 'center', 'marginTop': '10px', 'marginRight': '90px'}),
+                    html.P("Professor at UvA", style={'marginTop': '-15px', 'marginRight': '90px', 'fontStyle': 'italic'}),
+                    html.P("Supervisor", style={'marginTop': '-15px', 'color': 'grey', 'marginRight': '90px', 'fontStyle': 'italic'}),
+                ], style={'display': 'inline-block', 'margin': '10px'}),
+            ], style={'padding': '20px', 'maxWidth': '900px', 'margin': '0 auto', 'borderRadius': '10px', 'textAlign': 'center'}),
+
+            html.Div([
+                html.Div([
+                    html.Img(src=app.get_asset_url('profile_tessablanken.jpeg'), style={'width': '160px', 'height': '160px', 'borderRadius': '50%', 'marginRight': '70px'}),
+                    html.P("Tessa Blanken", style={'textAlign': 'center', 'marginTop': '10px', 'marginRight': '70px'}),
+                    html.P("Assistant Professor at UvA", style={'marginTop': '-15px', 'marginRight': '70px', 'fontStyle': 'italic'}),
+                    html.P("Collaborator", style={'marginTop': '-15px', 'color': 'grey', 'marginRight': '70px', 'fontStyle': 'italic'}),
                 ], style={'display': 'inline-block', 'margin': '10px'}),
 
                 html.Div([
-                    html.Img(src=app.get_asset_url('profile_tessablanken.jpeg'), style={'width': '160px', 'height': '160px', 'borderRadius': '50%'}),
-                    html.P("Tessa Blanken", style={'textAlign': 'center', 'marginTop': '10px'}),
-                    html.P("Assistant Professor at UvA", style={'marginTop': '-15px', 'fontStyle': 'italic'}),
-                    html.P("2nd Supervisor", style={'marginTop': '-15px', 'color': 'grey', 'fontStyle': 'italic'}),
+                    html.Img(src=app.get_asset_url('profile_larsklintwall.jpeg'), style={'width': '160px', 'height': '160px', 'borderRadius': '50%', 'marginRight': '70px'}),
+                    html.P("Lars Klintwall", style={'textAlign': 'center', 'marginTop': '10px', 'marginRight': '70px'}),
+                    html.P("Professor at Karolinska Institute", style={'marginTop': '-15px', 'marginRight': '70px', 'fontStyle': 'italic'}),
+                    html.P("Collaborator", style={'marginTop': '-15px', 'color': 'grey', 'marginRight': '70px', 'fontStyle': 'italic'}),
                 ], style={'display': 'inline-block', 'margin': '10px'}),
-            ], style={'padding': '20px', 'maxWidth': '900px', 'margin': '0 auto', 'borderRadius': '10px', 'textAlign': 'center'})
+
+                html.Div([
+                    html.Img(src=app.get_asset_url('profile_julianburger.jpeg'), style={'width': '160px', 'height': '160px', 'borderRadius': '50%'}),
+                    html.P("Julian Burger", style={'textAlign': 'center', 'marginTop': '10px'}),
+                    html.P("Postdoctorial Researcher at Yale", style={'marginTop': '-15px', 'fontStyle': 'italic'}),
+                    html.P("Collaborator", style={'marginTop': '-15px', 'color': 'grey', 'fontStyle': 'italic'}),
+                ], style={'display': 'inline-block', 'margin': '10px'}),
+            ], style={'padding': '20px', 'maxWidth': '900px', 'margin': '0 auto', 'borderRadius': '10px', 'textAlign': 'center'}),
 
             ])
             ])
+
 
 # Function: Initiate graph with elements
 def map_add_factors(session_data, value, severity_score):
