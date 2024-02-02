@@ -14,7 +14,7 @@ def create_iframe(src):
         src=src,
         allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture;fullscreen"
     )
-
+    
 # Function: Create dropdown menu 
 def create_dropdown(id, options, value, placeholder, multi=True):
     return dcc.Dropdown(
