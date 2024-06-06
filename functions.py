@@ -359,8 +359,10 @@ def create_about(app):
                 html.H2("more graspable", style={'fontFamily': 'Courier New', 'marginLeft': '40px', 'fontWeight': 'bold'}),
                 html.H2("for all", style={'fontFamily': 'Courier New', 'marginLeft': '40px', 'fontWeight': 'bold'}),
                 html.Br(),
-                html.P("With PsySys our goal is to convey the concepts of the network approach to psychopathology directly to users. Thereby, we want to provide users with tools to better understand the dynamics underlying their mental distress. The educational content was created and evaluated within the Psychology Research Master Thesis by Emily Campos Sindermann at the University of Amsterdam (UvA). Since then, we have continued to develop PsySys as a stand-alone application to further investigate its potential clinical utility.", 
+                html.P("With PsySys our goal is to convey the concepts of the network approach to psychopathology directly to users. Thereby, we want to provide users with tools to better understand the dynamics underlying their mental distress. The educational content was created and evaluated within the Psychology Research Master Thesis by Emily Campos Sindermann at the University of Amsterdam (UvA) which was awarded with the DPtV-master-research price by the German Association for Psychotherapists. Since then, we have continued to develop PsySys as a stand-alone application to further investigate its potential clinical utility.", 
                        style={'maxWidth': '900px', 'marginLeft': '40px', 'color':'grey'}),
+                html.Hr(style={'maxWidth': '900px', 'marginLeft': '40px'}),
+                html.P("Feedback? We would be happy to hear your thoughts via e-mail to campos.sindermann@gmail.com", style={'marginTop': '-15px', 'color': 'grey', 'marginRight': '70px', 'fontStyle': 'bold', 'marginLeft': '70px'}),
                 html.Hr(style={'maxWidth': '900px', 'marginLeft': '40px'}),
             ]),
             html.Div([
