@@ -361,7 +361,7 @@ def create_about(app):
                 html.Br(),
                 html.P("With PsySys our goal is to convey the concepts of the network approach to psychopathology directly to users. Thereby, we want to provide users with tools to better understand the dynamics underlying their mental distress. The educational content was created and evaluated within the Psychology Research Master Thesis by Emily Campos Sindermann at the University of Amsterdam (UvA) which was awarded with the DPtV-master-research price 2024 by the German Association for Psychotherapists. Since then, we have continued to develop PsySys as a stand-alone application.", 
                        style={'maxWidth': '900px', 'marginLeft': '40px', 'color':'grey'}),
-                html.P("Feedback? We would be happy to hear your thoughts via e-mail to campos.sindermann@gmail.com", style={'color': 'grey', 'fontStyle': 'italic','fontWeight': 'bold', 'marginLeft': '150px'}),
+                html.P("Feedback? We would be happy to hear your thoughts via e-mail to campos.sindermann@gmail.com", style={'color': 'grey', 'fontStyle': 'italic','fontWeight': 'bold', 'marginLeft': '100px'}),
                 html.Hr(style={'maxWidth': '900px', 'marginLeft': '40px'}),
             ]),
             html.Div([
